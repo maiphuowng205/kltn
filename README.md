@@ -20,6 +20,29 @@ Colab workflow:
 The old Vnstock V2 audit scripts remain available for provenance; they are not
 the main V3 experimental protocol.
 
+## V3 runnable stages
+
+The reusable method code is in `src/v3_method.py`; it never writes inside the
+frozen data directory. The main method is PTCST forecast + 252-session
+Ledoit–Wolf covariance + cost-aware long-only MVO. The runner writes protocol,
+freeze, environment, preprocessing, forecasts, weights, trades, solver and
+missing-return artifacts under a supplied `runs/` directory.
+
+```powershell
+python scripts/validate_v3_contract.py --workspace-root .
+python scripts/validate_v3_method.py --data-root data/lseg_v3
+python scripts/run_v3_forecast_baselines.py --run-dir runs/v3_forecast_baselines_main
+python scripts/run_v3_portfolio_benchmarks.py --forecast-run runs/v3_forecast_baselines_main --run-dir runs/v3_portfolio_benchmarks_main
+python scripts/run_v3_ptcst_method.py --model-type PTCST --run-dir runs/v3_ptcst_main_seed7
+python scripts/run_v3_ptcst_ablations.py --forecast-run runs/v3_ptcst_main_seed7 --run-dir runs/v3_ptcst_ablations
+python scripts/run_v3_walk_forward.py --run-dir runs/v3_walk_forward
+```
+
+The local full method evidence currently uses 207 train dates, 52 validation
+dates and 104 test dates with train-only median/IQR imputation. Primary
+portfolio metrics exclude dates whose five-session outcomes are not fully
+realized; those rows are retained in `missing_price_events.parquet`.
+
 ## Install
 
 ```powershell

@@ -39,11 +39,14 @@ def forecast_metrics_by_date(forecasts: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=ROOT/'data/lseg_v3'); p.add_argument('--run-dir',type=Path,default=ROOT/'runs/v3_ptcst_ca_mvo'); p.add_argument('--epochs',type=int,default=100); p.add_argument('--seed',type=int,default=7); p.add_argument('--batch-dates',type=int,default=16); p.add_argument('--early-stopping-patience',type=int,default=10); p.add_argument('--max-test-dates',type=int,default=0); p.add_argument('--device',default=None); args=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=ROOT/'data/lseg_v3'); p.add_argument('--run-dir',type=Path,default=ROOT/'runs/v3_ptcst_ca_mvo'); p.add_argument('--model-type',choices=['PTCST','PatchTST','TemporalTransformer'],default='PTCST'); p.add_argument('--epochs',type=int,default=100); p.add_argument('--seed',type=int,default=7); p.add_argument('--batch-dates',type=int,default=16); p.add_argument('--early-stopping-patience',type=int,default=10); p.add_argument('--max-test-dates',type=int,default=0); p.add_argument('--device',default=None); args=p.parse_args()
     out=args.run_dir; out.mkdir(parents=True,exist_ok=True)
+    workspace_root=args.data_root.parent.parent
+    validator=ROOT/'scripts'/'validate_v3_contract.py'
+    subprocess.run([sys.executable,str(validator),'--workspace-root',str(workspace_root)],check=True)
     manifest_path=args.data_root/'reports'/'freeze_manifest_v3.json'
     manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
-    protocol={'freeze_id':manifest.get('freeze_id'),'seed':args.seed,'features':'src.v3_method.FEATURES','lookback_sessions':60,'target':'target_excess_return_5d_bps','split_policy':{'train':'2019-2022','validation':'2023','test':'2024-2025'},'test_evaluation':'fixed_split_after_validation_selection','cost_one_way':0.001,'turnover_cap_l1':0.40,'max_weight':0.05,'risk_model':'LedoitWolf_252_session','solver_order':['CLARABEL','OSQP']}
+    protocol={'freeze_id':manifest.get('freeze_id'),'seed':args.seed,'model_type':args.model_type,'features':'src.v3_method.FEATURES','lookback_sessions':60,'target':'target_excess_return_5d_bps','split_policy':{'train':'2019-2022','validation':'2023','test':'2024-2025'},'test_evaluation':'fixed_split_after_validation_selection','cost_one_way':0.001,'turnover_cap_l1':0.40,'max_weight':0.05,'risk_model':'LedoitWolf_252_session','solver_order':['CLARABEL','OSQP']}
     (out/'protocol_lock.json').write_text(json.dumps(protocol,indent=2),encoding='utf-8')
     (out/'data_freeze.json').write_text(json.dumps({'freeze_id':manifest.get('freeze_id'),'file_count':manifest.get('file_count'),'manifest_sha256':hashlib.sha256(manifest_path.read_bytes()).hexdigest()},indent=2),encoding='utf-8')
     try: git_sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
@@ -54,8 +57,8 @@ def main():
     val,_,_=build_tensor_bundle(args.data_root,'validation',median,scale)
     test,_,_=build_tensor_bundle(args.data_root,'test',median,scale)
     (out/'preprocessing.json').write_text(json.dumps({'features':train.x.shape[-1],'lookback':train.x.shape[-2],'median':median.tolist(),'iqr':scale.tolist()},indent=2),encoding='utf-8')
-    train_report=train_ptcst(train,val,out,args.epochs,args.seed,args.batch_dates,args.device,args.early_stopping_patience)
-    val_pred=predict_ptcst(val,out/'best.pt',args.device); test_pred=predict_ptcst(test,out/'best.pt',args.device)
+    train_report=train_ptcst(train,val,out,args.epochs,args.seed,args.batch_dates,args.device,args.early_stopping_patience,args.model_type)
+    val_pred=predict_ptcst(val,out/'best.pt',args.device,args.model_type); test_pred=predict_ptcst(test,out/'best.pt',args.device,args.model_type)
     forecast_rows=[]
     for bundle,pred,name in ((val,val_pred,'validation'),(test,test_pred,'test')):
         for i,date in enumerate(bundle.dates):
@@ -104,6 +107,6 @@ def main():
         w_pre_map={ric:float(weight/post_total) for ric,weight in zip(rics,post)} if post_total>0 else {ric:float(weight) for ric,weight in zip(rics,w_new)}
     pd.DataFrame(weights).to_parquet(out/'weights.parquet',index=False); pd.DataFrame(trades).to_parquet(out/'trades.parquet',index=False); returns_df=pd.DataFrame(returns); returns_df.to_parquet(out/'portfolio_returns.parquet',index=False); pd.DataFrame(solver_rows).to_parquet(out/'solver_log.parquet',index=False); pd.DataFrame(missing_events, columns=['date','ric','reason']).to_parquet(out/'missing_price_events.parquet',index=False)
     eval_returns=returns_df.loc[returns_df.evaluation_available] if len(returns_df) else returns_df
-    summary={'created_at_utc':datetime.now(timezone.utc).isoformat(),'method':'PTCST forecast + Ledoit-Wolf covariance + cost-aware long-only MVO','train':train_report,'test_dates':len(returns_df),'evaluation_dates':len(eval_returns),'excluded_incomplete_dates':int(len(returns_df)-len(eval_returns)),'mean_net_excess_5d':float(eval_returns.net_excess_return_5d.mean()) if len(eval_returns) else None,'net_sharpe_annualized':float(eval_returns.net_excess_return_5d.mean()/eval_returns.net_excess_return_5d.std(ddof=1)*np.sqrt(52)) if len(eval_returns)>1 and eval_returns.net_excess_return_5d.std(ddof=1)>0 else None,'mean_turnover':float(eval_returns.turnover_l1.mean()) if len(eval_returns) else None,'epochs':args.epochs,'seed':args.seed}
+    summary={'created_at_utc':datetime.now(timezone.utc).isoformat(),'model_type':args.model_type,'method':f'{args.model_type} forecast + Ledoit-Wolf covariance + cost-aware long-only MVO','train':train_report,'test_dates':len(returns_df),'evaluation_dates':len(eval_returns),'excluded_incomplete_dates':int(len(returns_df)-len(eval_returns)),'mean_net_excess_5d':float(eval_returns.net_excess_return_5d.mean()) if len(eval_returns) else None,'net_sharpe_annualized':float(eval_returns.net_excess_return_5d.mean()/eval_returns.net_excess_return_5d.std(ddof=1)*np.sqrt(52)) if len(eval_returns)>1 and eval_returns.net_excess_return_5d.std(ddof=1)>0 else None,'mean_turnover':float(eval_returns.turnover_l1.mean()) if len(eval_returns) else None,'epochs':args.epochs,'seed':args.seed}
     (out/'metrics.json').write_text(json.dumps(summary,indent=2),encoding='utf-8'); print(json.dumps(summary,indent=2))
 if __name__=='__main__': main()

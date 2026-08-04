@@ -143,6 +143,45 @@ def build_tensor_bundle(data_root: Path, split: str, median: np.ndarray | None =
     return bundle, median, scale
 
 
+class TemporalTransformer(nn.Module):
+    """Vanilla temporal Transformer baseline without patching or cross-attention."""
+
+    def __init__(self, n_features: int = 17, d_model: int = 64, layers: int = 2, heads: int = 4, ffn_dim: int = 128, dropout: float = 0.10):
+        super().__init__()
+        self.projection = nn.Linear(n_features, d_model)
+        self.position = nn.Parameter(torch.zeros(1, 60, d_model)); nn.init.normal_(self.position, std=0.02)
+        layer = nn.TransformerEncoderLayer(d_model, heads, ffn_dim, dropout, batch_first=True, norm_first=True)
+        self.encoder = nn.TransformerEncoder(layer, layers)
+        self.head = nn.Sequential(nn.LayerNorm(d_model), nn.Linear(d_model, 32), nn.GELU(), nn.Dropout(dropout), nn.Linear(32, 1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, n, length, _ = x.shape
+        z = self.projection(x) + self.position[:, :length]
+        z = self.encoder(z.reshape(b * n, length, -1))[:, -1]
+        return self.head(z).reshape(b, n)
+
+
+class PatchTST(nn.Module):
+    """PatchTST-style temporal-only encoder; cross-sectional attention is absent."""
+
+    def __init__(self, n_features: int = 17, patch_length: int = 5, d_model: int = 64, layers: int = 2, heads: int = 4, ffn_dim: int = 128, dropout: float = 0.10):
+        super().__init__()
+        if 60 % patch_length: raise ValueError("lookback must be divisible by patch_length")
+        self.patch_length = patch_length; self.patch_count = 60 // patch_length
+        self.projection = nn.Linear(n_features * patch_length, d_model)
+        self.position = nn.Parameter(torch.zeros(1, self.patch_count, d_model)); nn.init.normal_(self.position, std=0.02)
+        layer = nn.TransformerEncoderLayer(d_model, heads, ffn_dim, dropout, batch_first=True, norm_first=True)
+        self.encoder = nn.TransformerEncoder(layer, layers)
+        self.head = nn.Sequential(nn.LayerNorm(d_model), nn.Linear(d_model, 32), nn.GELU(), nn.Dropout(dropout), nn.Linear(32, 1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, n, _, f = x.shape
+        patches = x.reshape(b, n, self.patch_count, self.patch_length * f)
+        z = self.projection(patches) + self.position[:, :self.patch_count]
+        z = self.encoder(z.reshape(b * n, self.patch_count, -1))[:, -1]
+        return self.head(z).reshape(b, n)
+
+
 class PTCST(nn.Module):
     """Patch temporal encoder followed by cross-sectional self-attention."""
 
@@ -180,11 +219,22 @@ def spearman_ic(pred: np.ndarray, target: np.ndarray, mask: np.ndarray) -> float
     return float(np.nanmean(values)) if values else float("nan")
 
 
-def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path, epochs: int = 100, seed: int = 7, batch_dates: int = 16, device: str | None = None, early_stopping_patience: int = 10) -> dict[str, object]:
+def make_forecast_model(model_type: str, n_features: int) -> nn.Module:
+    key = model_type.lower().replace("-", "").replace("_", "")
+    if key in ("temporal", "temporaltransformer", "vanillatransformer"):
+        return TemporalTransformer(n_features=n_features)
+    if key in ("patchtst",):
+        return PatchTST(n_features=n_features)
+    if key in ("ptcst", "proposed"):
+        return PTCST(n_features=n_features)
+    raise ValueError(f"unknown model_type={model_type}")
+
+
+def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path, epochs: int = 100, seed: int = 7, batch_dates: int = 16, device: str | None = None, early_stopping_patience: int = 10, model_type: str = "PTCST") -> dict[str, object]:
     seed_everything(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    model = PTCST(n_features=train.x.shape[-1]).to(device)
+    model = make_forecast_model(model_type, train.x.shape[-1]).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4)
     loss_fn = nn.HuberLoss(delta=1.0, reduction="none")
     tx, ty, tm = torch.from_numpy(train.x), torch.from_numpy(train.y), torch.from_numpy(train.mask)
@@ -206,19 +256,20 @@ def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path,
         if np.isfinite(ic) and ic > best_ic:
             best_ic, best_epoch = ic, epoch
             stale_epochs = 0
-            torch.save({"model": model.state_dict(), "seed": seed, "epoch": epoch, "validation_spearman_ic": ic}, output_dir / "best.pt")
+            torch.save({"model": model.state_dict(), "model_type": model_type, "seed": seed, "epoch": epoch, "validation_spearman_ic": ic}, output_dir / "best.pt")
         else:
             stale_epochs += 1
             if early_stopping_patience > 0 and stale_epochs >= early_stopping_patience:
                 break
     (output_dir / "training_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
-    return {"best_epoch": best_epoch, "best_validation_spearman_ic": float(best_ic), "epochs_completed": len(history), "early_stopping_patience": early_stopping_patience, "device": device, "seed": seed}
+    return {"model_type": model_type, "best_epoch": best_epoch, "best_validation_spearman_ic": float(best_ic), "epochs_completed": len(history), "early_stopping_patience": early_stopping_patience, "device": device, "seed": seed}
 
 
-def predict_ptcst(bundle: TensorBundle, checkpoint: Path, device: str | None = None) -> np.ndarray:
+def predict_ptcst(bundle: TensorBundle, checkpoint: Path, device: str | None = None, model_type: str | None = None) -> np.ndarray:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-    model = PTCST(n_features=bundle.x.shape[-1]).to(device)
     state = torch.load(checkpoint, map_location=device)
+    model_type = model_type or state.get("model_type", "PTCST")
+    model = make_forecast_model(model_type, bundle.x.shape[-1]).to(device)
     model.load_state_dict(state["model"]); model.eval()
     with torch.no_grad(): return model(torch.from_numpy(bundle.x).to(device)).cpu().numpy()
 
