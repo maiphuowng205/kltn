@@ -36,6 +36,8 @@ python scripts/run_v3_portfolio_benchmarks.py --forecast-run runs/v3_forecast_ba
 python scripts/run_v3_ptcst_method.py --model-type PTCST --run-dir runs/v3_ptcst_main_seed7
 python scripts/run_v3_ptcst_ablations.py --forecast-run runs/v3_ptcst_main_seed7 --run-dir runs/v3_ptcst_ablations
 python scripts/run_v3_walk_forward.py --run-dir runs/v3_walk_forward
+python scripts/run_v3_statistical_tests.py --forecast-runs baseline=runs/v3_forecast_baselines_main ptcst=runs/v3_ptcst_main_seed7_v5
+python scripts/run_v3_robustness.py --forecast-run runs/v3_ptcst_main_seed7_v5 --run-dir runs/v3_robustness_main
 ```
 
 The local full method evidence currently uses 207 train dates, 52 validation
