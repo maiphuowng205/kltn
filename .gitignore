@@ -1,0 +1,12 @@
+.env
+data/processed/*.log
+
+# Local/licensed data and generated artifacts are supplied separately in Colab.
+data/
+archive/
+runs/
+logs/
+.venv/
+__pycache__/
+*.pyc
+*.log
