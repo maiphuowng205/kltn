@@ -515,24 +515,24 @@ Drive synchronization and the final handoff have not been claimed complete.
 - [ ] Build the 100 × 60 × F tensor cache.
 - [ ] Verify timestamps are no later than signal close.
 - [ ] Verify exactly 100 assets per forecast date.
-- [ ] Fit imputer/scaler on train rows only.
-- [ ] Run zero and historical-mean forecasts.
-- [ ] Run Ridge forecast.
-- [ ] Run XGBoost forecast.
-- [ ] Save date-level forecast metrics and predictions.
+- [x] Fit imputer/scaler on train rows only (verified in the seed-7 method run).
+- [x] Run zero and historical-mean forecasts (full local baseline run).
+- [x] Run Ridge forecast (full local baseline run).
+- [x] Run XGBoost forecast (full local baseline run).
+- [x] Save date-level forecast metrics and predictions.
 - [ ] Complete leakage tests for the loader and preprocessing.
 
 ### M3–M5: risk, optimizer and non-deep portfolio benchmark
 
 - [ ] Produce 252-session risk-coverage report.
-- [ ] Run Ledoit–Wolf covariance checks.
-- [ ] Run EW and EW-BH.
-- [ ] Run MinVar.
-- [ ] Run HM-MVO, Ridge-MVO and XGB-MVO.
-- [ ] Run XGB-CA-MVO.
-- [ ] Verify optimizer constraints and deterministic fallback.
-- [ ] Verify drift, turnover, cost and net-return accounting.
-- [ ] Save weights, trades, solver log and portfolio returns.
+- [x] Run Ledoit–Wolf covariance checks.
+- [x] Run EW and EW-BH (full local benchmark run).
+- [x] Run MinVar (full local benchmark run).
+- [x] Run HM-MVO, Ridge-MVO and XGB-MVO (full local benchmark run).
+- [x] Run XGB-CA-MVO (full local benchmark run).
+- [x] Verify optimizer constraints and deterministic fallback.
+- [x] Verify drift, turnover, cost and net-return accounting.
+- [x] Save weights, trades, solver log and portfolio returns.
 - [ ] Confirm repeated run produces identical non-deep outputs.
 
 ### M6–M7: deep models and main ablations
@@ -541,22 +541,22 @@ Drive synchronization and the final handoff have not been claimed complete.
 - [ ] Run PatchTST temporal-only baseline.
 - [ ] Run PTCST with seeds 7, 19, 43, 71 and 101.
 - [ ] Save checkpoints, learning curves and validation selection records.
-- [ ] Run PTCST-Top20.
-- [ ] Run PTCST-MVO.
-- [ ] Run PTCST-CA-MVO.
+- [x] Run PTCST-Top20 (seed-7 local run).
+- [x] Run PTCST-MVO (seed-7 local run).
+- [x] Run PTCST-CA-MVO (seed-7 local run).
 - [ ] Complete forecast-value, optimizer-value and cost-awareness ablations.
 
 ### M8–M10: locked evaluation and reporting
 
 - [ ] Write protocol-lock JSON before opening test labels.
 - [ ] Run fixed-split test once.
-- [ ] Run expanding quarterly walk-forward.
+- [x] Run expanding quarterly walk-forward (Ridge, eight quarterly retraining points).
 - [ ] Verify retraining uses only realized labels.
-- [ ] Compute forecast and portfolio metrics by date.
-- [ ] Run DM/HLN on date-level forecast losses.
-- [ ] Run paired block/stationary bootstrap.
+- [x] Compute forecast and portfolio metrics by date.
+- [x] Run DM/HLN on date-level forecast losses.
+- [x] Run paired block/stationary bootstrap.
 - [ ] Run the pre-specified cost/covariance/lookback robustness grid.
-- [ ] Generate final tables, figures and run manifest.
+- [x] Generate final tables and run manifest (figures remain a reporting-layer task).
 - [ ] Sync completed artifacts/checkpoints to Drive.
 - [ ] Archive the exact notebook outputs and environment metadata.
 
