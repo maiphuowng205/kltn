@@ -7,3 +7,4 @@ cvxpy>=1.4
 torch>=2.2
 xgboost>=2.0
 tqdm>=4.66
+pytest>=8.0

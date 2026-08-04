@@ -7,3 +7,4 @@ scikit-learn>=1.4
 cvxpy>=1.4
 torch>=2.2
 xgboost>=2.0
+pytest>=8.0

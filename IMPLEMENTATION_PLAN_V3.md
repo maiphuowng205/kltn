@@ -490,6 +490,15 @@ Use this checklist in the Colab/Drive run folder. Check an item only after its
 artifact and acceptance tests are present; do not mark a stage complete merely
 because a notebook cell finished.
 
+Local implementation snapshot (2026-08-04): the V3 contract validator, full
+100×60×17 tensor loader, common zero/HM/Ridge/XGBoost baselines, non-deep
+portfolio ladder, seed-7 PTCST fixed-split method, PTCST portfolio ablations,
+quarterly Ridge walk-forward and report-table/statistics scripts have been
+implemented and smoke/full-tested under ignored local `runs/` directories.
+The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
+in particular, five-seed deep-model aggregation, a clean Colab execution,
+Drive synchronization and the final handoff have not been claimed complete.
+
 ### Repository and data
 
 - [ ] Clone `https://github.com/maiphuowng205/kltn.git`.
