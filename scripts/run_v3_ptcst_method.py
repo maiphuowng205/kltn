@@ -49,11 +49,13 @@ def main():
     dates=list(test.dates); dates=dates[:args.max_test_dates] if args.max_test_dates else dates
     for i,date64 in enumerate(dates):
         date=pd.Timestamp(date64); rics=[str(x) for x in test.rics[i]]; pred=test_pred[i]; covariance,valid,risk_status=ledoit_covariance(daily,date,rics)
+        exited={ric:weight for ric,weight in w_pre_map.items() if ric not in set(rics)}
+        exited_weight=float(sum(exited.values()))
         w_pre=np.asarray([w_pre_map.get(ric,0.0) for ric in rics],dtype=float)
         if i == 0 and w_pre.sum() == 0 and valid.sum() >= 20:
             w_pre[valid] = 1.0 / valid.sum()
-        w_new,solver=cost_aware_mvo(pred/10000.0,covariance,w_pre,valid)
-        turn=float(np.abs(w_new-w_pre).sum()); realized=[]; raw=[]
+        w_new,solver=cost_aware_mvo(pred/10000.0,covariance,w_pre,valid,turnover_fixed=exited_weight)
+        turn=float(np.abs(w_new-w_pre).sum()+exited_weight); realized=[]; raw=[]
         for ric in rics:
             try: row=daily_map.loc[(date,ric)]; realized.append(float(row['future_excess_5d'])); raw.append(float(row['future_raw_5d']))
             except KeyError: realized.append(np.nan); raw.append(np.nan)
@@ -65,8 +67,10 @@ def main():
             gross=float('nan'); net=float('nan')
             for ric,ok in zip(rics,realized_ok):
                 if not ok: missing_events.append({'date':date,'ric':ric,'reason':'future_5_session_return_unavailable'})
-        returns.append({'date':date,'gross_excess_return_5d':gross,'turnover_l1':turn,'cost':0.001*turn,'net_excess_return_5d':net,'evaluation_available':bool(realized_ok.all()),'available_realized_assets':int(realized_ok.sum()),'risk_fallback':risk_status.get('fallback'),'risk_valid_assets':risk_status.get('valid_assets'),'risk_window_rows':risk_status.get('window_rows'),'solver':solver.get('solver'),'solver_status':solver.get('status'),'solver_fallback':solver.get('fallback')})
-        solver_rows.append({'date':date,**risk_status,**solver})
+        returns.append({'date':date,'gross_excess_return_5d':gross,'turnover_l1':turn,'turnover_exited':exited_weight,'cost':0.001*turn,'net_excess_return_5d':net,'evaluation_available':bool(realized_ok.all()),'available_realized_assets':int(realized_ok.sum()),'risk_fallback':risk_status.get('fallback'),'risk_valid_assets':risk_status.get('valid_assets'),'risk_window_rows':risk_status.get('window_rows'),'solver':solver.get('solver'),'solver_status':solver.get('status'),'solver_fallback':solver.get('fallback')})
+        solver_rows.append({'date':date,'turnover_exited':exited_weight,**risk_status,**solver})
+        for ric,pre in exited.items():
+            trades.append({'date':date,'ric':ric,'trade':float(-pre),'exited_universe':True})
         for ric,weight,pre in zip(rics,w_new,w_pre): weights.append({'date':date,'ric':ric,'weight':float(weight),'w_pre':float(pre)}); trades.append({'date':date,'ric':ric,'trade':float(weight-pre)})
         # Drift the current holdings and align them by RIC for the next date.
         # Missing future returns are neutral only for state carry-forward and

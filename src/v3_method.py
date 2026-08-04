@@ -242,13 +242,14 @@ def ledoit_covariance(daily: pd.DataFrame, date: pd.Timestamp, rics: list[str], 
     return covariance, valid, status
 
 
-def cost_aware_mvo(mu: np.ndarray, covariance: np.ndarray, w_pre: np.ndarray, valid: np.ndarray, risk_aversion: float = 10.0, cost: float = 0.001, max_weight: float = 0.05, turnover_cap: float = 0.40) -> tuple[np.ndarray, dict[str, object]]:
+def cost_aware_mvo(mu: np.ndarray, covariance: np.ndarray, w_pre: np.ndarray, valid: np.ndarray, risk_aversion: float = 10.0, cost: float = 0.001, max_weight: float = 0.05, turnover_cap: float = 0.40, turnover_fixed: float = 0.0) -> tuple[np.ndarray, dict[str, object]]:
     n = len(mu); w = cp.Variable(n)
-    constraints = [cp.sum(w) == 1, w >= 0, w <= max_weight, cp.sum(cp.abs(w - w_pre)) <= turnover_cap]
+    variable_turnover = cp.sum(cp.abs(w - w_pre))
+    constraints = [cp.sum(w) == 1, w >= 0, w <= max_weight, variable_turnover + float(turnover_fixed) <= turnover_cap]
     fixed = np.flatnonzero(~valid)
     if len(fixed): constraints.append(w[fixed] == w_pre[fixed])
     sigma = np.asarray(covariance, dtype=float) + np.eye(n) * 1e-8
-    objective = cp.Maximize(mu @ w - risk_aversion / 2 * cp.quad_form(w, cp.psd_wrap(sigma)) - cost * cp.sum(cp.abs(w - w_pre)))
+    objective = cp.Maximize(mu @ w - risk_aversion / 2 * cp.quad_form(w, cp.psd_wrap(sigma)) - cost * (variable_turnover + float(turnover_fixed)))
     problem = cp.Problem(objective, constraints); status = None
     for solver in ("CLARABEL", "OSQP"):
         try:
@@ -258,6 +259,6 @@ def cost_aware_mvo(mu: np.ndarray, covariance: np.ndarray, w_pre: np.ndarray, va
         except Exception:
             continue
     if w.value is None or problem.status not in (cp.OPTIMAL, cp.OPTIMAL_INACCURATE):
-        return w_pre.copy(), {"solver": status, "status": str(problem.status), "fallback": "w_pre"}
+        return w_pre.copy(), {"solver": status, "status": str(problem.status), "fallback": "w_pre", "turnover_fixed": float(turnover_fixed)}
     result = np.asarray(w.value).reshape(-1); result[result < 0] = 0; result /= result.sum()
-    return result, {"solver": status, "status": str(problem.status), "fallback": None, "objective": float(problem.value)}
+    return result, {"solver": status, "status": str(problem.status), "fallback": None, "objective": float(problem.value), "turnover_fixed": float(turnover_fixed)}
