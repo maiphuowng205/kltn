@@ -555,7 +555,7 @@ Drive synchronization and the final handoff have not been claimed complete.
 - [x] Compute forecast and portfolio metrics by date.
 - [x] Run DM/HLN on date-level forecast losses.
 - [x] Run paired block/stationary bootstrap.
-- [ ] Run the pre-specified cost/covariance/lookback robustness grid.
+- [x] Run the pre-specified cost/covariance/lookback robustness grid (21 one-dimension-at-a-time variants; full local run).
 - [x] Generate final tables and run manifest (figures remain a reporting-layer task).
 - [ ] Sync completed artifacts/checkpoints to Drive.
 - [ ] Archive the exact notebook outputs and environment metadata.
