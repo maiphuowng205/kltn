@@ -483,3 +483,78 @@ If Colab disconnects, rerun Notebook 00 with the same pinned commit/config and r
 | E | Notebook 07 / M10 | Robustness appendix and final generated tables |
 
 The recommended first implementation target is Slice A. It validates the frozen data contract and forecast evaluation before optimization or GPU training introduces additional failure modes.
+
+## 9. Execution checklist
+
+Use this checklist in the Colab/Drive run folder. Check an item only after its
+artifact and acceptance tests are present; do not mark a stage complete merely
+because a notebook cell finished.
+
+### Repository and data
+
+- [ ] Clone `https://github.com/maiphuowng205/kltn.git`.
+- [ ] Record the pinned Git commit SHA.
+- [ ] Mount Google Drive and set `V3_DRIVE_ROOT`.
+- [ ] Copy the user-uploaded frozen V3 package to Colab local storage.
+- [ ] Verify all 276 freeze-manifest checksums.
+- [ ] Confirm V3 and RF paths are read-only during the run.
+- [ ] Capture Python, package, device and runtime metadata.
+
+### M0–M2: data and forecast baselines
+
+- [ ] Run Notebook 00 setup and contract validation.
+- [ ] Build the 100 × 60 × F tensor cache.
+- [ ] Verify timestamps are no later than signal close.
+- [ ] Verify exactly 100 assets per forecast date.
+- [ ] Fit imputer/scaler on train rows only.
+- [ ] Run zero and historical-mean forecasts.
+- [ ] Run Ridge forecast.
+- [ ] Run XGBoost forecast.
+- [ ] Save date-level forecast metrics and predictions.
+- [ ] Complete leakage tests for the loader and preprocessing.
+
+### M3–M5: risk, optimizer and non-deep portfolio benchmark
+
+- [ ] Produce 252-session risk-coverage report.
+- [ ] Run Ledoit–Wolf covariance checks.
+- [ ] Run EW and EW-BH.
+- [ ] Run MinVar.
+- [ ] Run HM-MVO, Ridge-MVO and XGB-MVO.
+- [ ] Run XGB-CA-MVO.
+- [ ] Verify optimizer constraints and deterministic fallback.
+- [ ] Verify drift, turnover, cost and net-return accounting.
+- [ ] Save weights, trades, solver log and portfolio returns.
+- [ ] Confirm repeated run produces identical non-deep outputs.
+
+### M6–M7: deep models and main ablations
+
+- [ ] Run vanilla temporal Transformer.
+- [ ] Run PatchTST temporal-only baseline.
+- [ ] Run PTCST with seeds 7, 19, 43, 71 and 101.
+- [ ] Save checkpoints, learning curves and validation selection records.
+- [ ] Run PTCST-Top20.
+- [ ] Run PTCST-MVO.
+- [ ] Run PTCST-CA-MVO.
+- [ ] Complete forecast-value, optimizer-value and cost-awareness ablations.
+
+### M8–M10: locked evaluation and reporting
+
+- [ ] Write protocol-lock JSON before opening test labels.
+- [ ] Run fixed-split test once.
+- [ ] Run expanding quarterly walk-forward.
+- [ ] Verify retraining uses only realized labels.
+- [ ] Compute forecast and portfolio metrics by date.
+- [ ] Run DM/HLN on date-level forecast losses.
+- [ ] Run paired block/stationary bootstrap.
+- [ ] Run the pre-specified cost/covariance/lookback robustness grid.
+- [ ] Generate final tables, figures and run manifest.
+- [ ] Sync completed artifacts/checkpoints to Drive.
+- [ ] Archive the exact notebook outputs and environment metadata.
+
+### Final handoff gate
+
+- [ ] All required run artifacts listed in Section 5 exist.
+- [ ] No test result was used for model selection or tuning.
+- [ ] Every strategy paid the same realized cost rule.
+- [ ] Claim restrictions in `FROZEN_DATASET_V3.md` are reproduced in the report.
+- [ ] Final report identifies the Git commit, freeze ID and run ID.
