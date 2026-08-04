@@ -520,11 +520,11 @@ Drive synchronization and the final handoff have not been claimed complete.
 - [x] Run Ridge forecast (full local baseline run).
 - [x] Run XGBoost forecast (full local baseline run).
 - [x] Save date-level forecast metrics and predictions.
-- [ ] Complete leakage tests for the loader and preprocessing.
+- [x] Complete leakage tests for the loader and preprocessing.
 
 ### M3–M5: risk, optimizer and non-deep portfolio benchmark
 
-- [ ] Produce 252-session risk-coverage report.
+- [x] Produce 252-session risk-coverage report (train/validation only; zero fallback dates).
 - [x] Run Ledoit–Wolf covariance checks.
 - [x] Run EW and EW-BH (full local benchmark run).
 - [x] Run MinVar (full local benchmark run).
@@ -533,7 +533,7 @@ Drive synchronization and the final handoff have not been claimed complete.
 - [x] Verify optimizer constraints and deterministic fallback.
 - [x] Verify drift, turnover, cost and net-return accounting.
 - [x] Save weights, trades, solver log and portfolio returns.
-- [ ] Confirm repeated run produces identical non-deep outputs.
+- [x] Confirm repeated run produces identical non-deep outputs (forecast and portfolio SHA-256 comparison).
 
 ### M6–M7: deep models and main ablations
 
