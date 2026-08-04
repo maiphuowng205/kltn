@@ -12,7 +12,7 @@ Dataset V3 is immutable. All code must verify `data/lseg_v3/reports/freeze_manif
 
 Main-market scope is Vietnam only. The US dataset is excluded. Claims prohibited by `FROZEN_DATASET_V3.md`, including “survivorship-bias-free” and observed historical bid/ask costs, remain prohibited.
 
-Execution platform is Google Colab. Each notebook starts from a clean Colab runtime, clones `https://github.com/khoilv2005/temp.git`, checks out a pinned commit, installs the Colab requirements and calls reusable Python modules/scripts from the cloned repository. Notebooks are orchestration layers; research logic remains in `src/` so results do not depend on hidden notebook state.
+Execution platform is Google Colab. Each notebook starts from a clean Colab runtime, clones `https://github.com/maiphuowng205/kltn.git`, checks out a pinned commit, installs the Colab requirements and calls reusable Python modules/scripts from the cloned repository. Notebooks are orchestration layers; research logic remains in `src/` so results do not depend on hidden notebook state.
 
 ## 2. Frozen empirical contract
 
@@ -40,7 +40,7 @@ Execution platform is Google Colab. Each notebook starts from a clean Colab runt
 
 ### Code distribution
 
-- GitHub repository: `https://github.com/khoilv2005/temp.git`.
+- GitHub repository: `https://github.com/maiphuowng205/kltn.git`.
 - GitHub contains notebooks, source code, configurations, tests and small metadata files.
 - Every final run checks out a commit SHA, not an unpinned moving branch.
 - Colab records the commit SHA in `environment.json` and every result manifest.
@@ -88,8 +88,8 @@ from google.colab import drive
 drive.mount('/content/drive')
 
 # Shell commands executed by the notebook:
-# git clone --depth 1 https://github.com/khoilv2005/temp.git /content/temp
-# cd /content/temp
+# git clone --depth 1 https://github.com/maiphuowng205/kltn.git /content/kltn
+# cd /content/kltn
 # git fetch --depth 1 origin <PINNED_COMMIT>
 # git checkout <PINNED_COMMIT>
 # python -m pip install -r requirements-colab.txt
