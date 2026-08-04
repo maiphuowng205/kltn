@@ -1,0 +1,63 @@
+experiment:
+  name: vn_v3_ptcst_ca_mvo
+  scope: vietnam_only
+  freeze_id: vn_v3_lseg_2026-08-03
+  github_repository: https://github.com/maiphuowng205/kltn.git
+  seed: 7
+  seeds: [7, 19, 43, 71, 101]
+data:
+  root: data/lseg_v3
+  universe_size: 100
+  lookback_sessions: 60
+  features:
+    - return_1d
+    - return_5d
+    - return_10d
+    - return_20d
+    - return_60d
+    - vol_5d
+    - vol_20d
+    - vol_60d
+    - log_volume
+    - log_dollar_volume
+    - log_price
+    - log_market_cap
+    - high_low_proxy
+    - amihud
+    - day_of_week
+    - is_month_end
+    - is_quarter_end
+  target: target_excess_return_5d_bps
+  splits:
+    train: 2019-01-01/2022-12-31
+    validation: 2023-01-01/2023-12-31
+    test: 2024-01-01/2025-12-31
+forecast:
+  imputation: train_median
+  scaling: train_robust_iqr
+  clipping: [-10.0, 10.0]
+  target_mask: target_available
+ptcst:
+  patch_length: 5
+  d_model: 64
+  temporal_layers: 2
+  cross_sectional_layers: 1
+  heads: 4
+  ffn_dim: 128
+  dropout: 0.10
+  optimizer: AdamW
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  loss: Huber
+  max_epochs: 100
+  early_stopping_patience: 10
+  gradient_clip_norm: 1.0
+  selection_metric: validation_mean_weekly_spearman_ic
+portfolio:
+  covariance: ledoit_wolf
+  covariance_window_sessions: 252
+  risk_aversion: 10.0
+  cost_one_way: 0.001
+  turnover_cap_l1: 0.40
+  max_weight: 0.05
+  solver_order: [CLARABEL, OSQP]

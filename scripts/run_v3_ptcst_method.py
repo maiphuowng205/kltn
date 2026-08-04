@@ -1,6 +1,6 @@
 """Run the frozen Vietnam V3 method: PTCST forecast + cost-aware MVO."""
 from __future__ import annotations
-import argparse, json
+import argparse, json, hashlib, platform, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -26,9 +26,30 @@ def future_returns(daily: pd.DataFrame) -> pd.DataFrame:
         out.append(g[["date","ric","future_raw_5d","future_excess_5d"]])
     return pd.concat(out,ignore_index=True)
 
+def forecast_metrics_by_date(forecasts: pd.DataFrame) -> pd.DataFrame:
+    rows=[]
+    for (split,date), group in forecasts.groupby(['split','date'],sort=True):
+        g=group.loc[group.target_available & np.isfinite(group.prediction_excess_return_5d_bps) & np.isfinite(group.target_excess_return_5d_bps)]
+        n=len(g)
+        row={'split':split,'date':date,'n_assets':n}
+        if n>=3:
+            p=g.prediction_excess_return_5d_bps.to_numpy(float); y=g.target_excess_return_5d_bps.to_numpy(float); order=np.argsort(p); k=max(1,int(np.floor(n*.2)))
+            row.update({'spearman_ic':float(pd.Series(p).rank().corr(pd.Series(y).rank())),'pearson_ic':float(np.corrcoef(p,y)[0,1]) if np.std(p)>0 and np.std(y)>0 else np.nan,'mae_bps':float(np.mean(np.abs(p-y))),'rmse_bps':float(np.sqrt(np.mean((p-y)**2))),'directional_accuracy':float(np.mean(np.sign(p)==np.sign(y))),'top_minus_bottom_bps':float(np.mean(y[order[-k:]])-np.mean(y[order[:k]]))})
+        rows.append(row)
+    return pd.DataFrame(rows)
+
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=ROOT/'data/lseg_v3'); p.add_argument('--run-dir',type=Path,default=ROOT/'runs/v3_ptcst_ca_mvo'); p.add_argument('--epochs',type=int,default=100); p.add_argument('--seed',type=int,default=7); p.add_argument('--batch-dates',type=int,default=16); p.add_argument('--early-stopping-patience',type=int,default=10); p.add_argument('--max-test-dates',type=int,default=0); p.add_argument('--device',default=None); args=p.parse_args()
     out=args.run_dir; out.mkdir(parents=True,exist_ok=True)
+    manifest_path=args.data_root/'reports'/'freeze_manifest_v3.json'
+    manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+    protocol={'freeze_id':manifest.get('freeze_id'),'seed':args.seed,'features':'src.v3_method.FEATURES','lookback_sessions':60,'target':'target_excess_return_5d_bps','split_policy':{'train':'2019-2022','validation':'2023','test':'2024-2025'},'test_evaluation':'fixed_split_after_validation_selection','cost_one_way':0.001,'turnover_cap_l1':0.40,'max_weight':0.05,'risk_model':'LedoitWolf_252_session','solver_order':['CLARABEL','OSQP']}
+    (out/'protocol_lock.json').write_text(json.dumps(protocol,indent=2),encoding='utf-8')
+    (out/'data_freeze.json').write_text(json.dumps({'freeze_id':manifest.get('freeze_id'),'file_count':manifest.get('file_count'),'manifest_sha256':hashlib.sha256(manifest_path.read_bytes()).hexdigest()},indent=2),encoding='utf-8')
+    try: git_sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+    except Exception: git_sha=None
+    environment={'created_at_utc':datetime.now(timezone.utc).isoformat(),'python':sys.version,'platform':platform.platform(),'git_commit':git_sha,'device':args.device or ('cuda' if __import__('torch').cuda.is_available() else 'cpu')}
+    (out/'environment.json').write_text(json.dumps(environment,indent=2),encoding='utf-8')
     train,median,scale=build_tensor_bundle(args.data_root,'train')
     val,_,_=build_tensor_bundle(args.data_root,'validation',median,scale)
     test,_,_=build_tensor_bundle(args.data_root,'test',median,scale)
@@ -40,6 +61,9 @@ def main():
         for i,date in enumerate(bundle.dates):
             for j,ric in enumerate(bundle.rics[i]): forecast_rows.append({'date':pd.Timestamp(date),'ric':ric,'split':name,'prediction_excess_return_5d_bps':float(pred[i,j]),'target_excess_return_5d_bps':float(bundle.y[i,j]),'target_available':bool(bundle.mask[i,j])})
     forecasts=pd.DataFrame(forecast_rows); forecasts.to_parquet(out/'forecasts.parquet',index=False)
+    forecast_metrics_by_date(forecasts).to_parquet(out/'forecast_metrics_by_date.parquet',index=False)
+    (out/'imputer.json').write_text(json.dumps({'method':'train_median','median':median.tolist()},indent=2),encoding='utf-8')
+    (out/'scaler.json').write_text(json.dumps({'method':'train_iqr','iqr':scale.tolist(),'clip':[-10.0,10.0]},indent=2),encoding='utf-8')
     daily=pd.read_parquet(args.data_root/'curated/daily_panel.parquet'); daily['date']=pd.to_datetime(daily['date']).dt.normalize(); daily['session_id']=daily['session_id'].astype(int); daily['rf_daily']=pd.to_numeric(daily['rf_daily'],errors='coerce').fillna(0.0); daily=daily.merge(future_returns(daily),on=['date','ric'],how='left',validate='one_to_one')
     daily_map=daily.set_index(['date','ric'])
     weights=[]; trades=[]; returns=[]; solver_rows=[]; missing_events=[]

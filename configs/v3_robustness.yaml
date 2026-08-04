@@ -1,0 +1,6 @@
+cost_bps: [0, 5, 10, 20, 30, 50]
+covariance: [ledoit_wolf, sample, ewma_half_life_60]
+lookback_sessions: [20, 60, 120]
+turnover_cap_l1: [0.20, 0.40, 0.80]
+max_weight: [0.03, 0.05, 0.10]
+risk_aversion: [5.0, 10.0, 20.0]
