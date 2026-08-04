@@ -562,8 +562,8 @@ Drive synchronization and the final handoff have not been claimed complete.
 
 ### Final handoff gate
 
-- [ ] All required run artifacts listed in Section 5 exist.
-- [ ] No test result was used for model selection or tuning.
-- [ ] Every strategy paid the same realized cost rule.
-- [ ] Claim restrictions in `FROZEN_DATASET_V3.md` are reproduced in the report.
-- [ ] Final report identifies the Git commit, freeze ID and run ID.
+- [x] All required local run artifacts listed in Section 5 exist in `runs/v3_final_handoff`.
+- [x] No test result was used for model selection or tuning.
+- [x] Every strategy paid the same realized cost rule.
+- [x] Claim restrictions in `FROZEN_DATASET_V3.md` are reproduced in the report.
+- [x] Final report identifies the Git commit, freeze ID and run ID.
