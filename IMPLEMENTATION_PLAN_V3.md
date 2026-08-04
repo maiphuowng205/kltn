@@ -537,14 +537,14 @@ Drive synchronization and the final handoff have not been claimed complete.
 
 ### M6–M7: deep models and main ablations
 
-- [ ] Run vanilla temporal Transformer.
-- [ ] Run PatchTST temporal-only baseline.
+- [x] Run vanilla temporal Transformer (seed-7 full local run).
+- [x] Run PatchTST temporal-only baseline (seed-7 full local run).
 - [x] Run PTCST with seeds 7, 19, 43, 71 and 101 (local sweep).
 - [x] Save checkpoints, learning curves and validation selection records (per seed).
 - [x] Run PTCST-Top20 (seed-7 local run).
 - [x] Run PTCST-MVO (seed-7 local run).
 - [x] Run PTCST-CA-MVO (seed-7 local run).
-- [ ] Complete forecast-value, optimizer-value and cost-awareness ablations.
+- [x] Complete forecast-value, optimizer-value and cost-awareness ablations (local fixed-split runs).
 
 ### M8–M10: locked evaluation and reporting
 
