@@ -548,10 +548,10 @@ Drive synchronization and the final handoff have not been claimed complete.
 
 ### M8–M10: locked evaluation and reporting
 
-- [ ] Write protocol-lock JSON before opening test labels.
-- [ ] Run fixed-split test once.
+- [x] Write protocol-lock JSON before opening test labels.
+- [x] Run fixed-split test once for the locked seed-7 method run.
 - [x] Run expanding quarterly walk-forward (Ridge, eight quarterly retraining points).
-- [ ] Verify retraining uses only realized labels.
+- [x] Verify retraining uses only realized labels (quarterly walk-forward cutoff audit).
 - [x] Compute forecast and portfolio metrics by date.
 - [x] Run DM/HLN on date-level forecast losses.
 - [x] Run paired block/stationary bootstrap.
