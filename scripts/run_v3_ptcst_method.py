@@ -43,7 +43,6 @@ def main():
     out=args.run_dir; out.mkdir(parents=True,exist_ok=True)
     workspace_root=args.data_root.parent.parent
     validator=ROOT/'scripts'/'validate_v3_contract.py'
-    subprocess.run([sys.executable,str(validator),'--workspace-root',str(workspace_root)],check=True)
     manifest_path=args.data_root/'reports'/'freeze_manifest_v3.json'
     manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
     protocol={'freeze_id':manifest.get('freeze_id'),'seed':args.seed,'model_type':args.model_type,'features':'src.v3_method.FEATURES','lookback_sessions':60,'target':'target_excess_return_5d_bps','split_policy':{'train':'2019-2022','validation':'2023','test':'2024-2025'},'test_evaluation':'fixed_split_after_validation_selection','cost_one_way':0.001,'turnover_cap_l1':0.40,'max_weight':0.05,'risk_model':'LedoitWolf_252_session','solver_order':['CLARABEL','OSQP']}
@@ -53,6 +52,10 @@ def main():
     except Exception: git_sha=None
     environment={'created_at_utc':datetime.now(timezone.utc).isoformat(),'python':sys.version,'platform':platform.platform(),'git_commit':git_sha,'device':args.device or ('cuda' if __import__('torch').cuda.is_available() else 'cpu')}
     (out/'environment.json').write_text(json.dumps(environment,indent=2),encoding='utf-8')
+    # Lock the protocol before the contract validator opens model-ready rows
+    # containing test labels.  A changed/missing frozen file then aborts the
+    # run before any train/validation/test tensor is constructed.
+    subprocess.run([sys.executable,str(validator),'--workspace-root',str(workspace_root)],check=True)
     train,median,scale=build_tensor_bundle(args.data_root,'train')
     val,_,_=build_tensor_bundle(args.data_root,'validation',median,scale)
     test,_,_=build_tensor_bundle(args.data_root,'test',median,scale)
