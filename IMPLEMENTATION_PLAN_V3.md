@@ -539,8 +539,8 @@ Drive synchronization and the final handoff have not been claimed complete.
 
 - [ ] Run vanilla temporal Transformer.
 - [ ] Run PatchTST temporal-only baseline.
-- [ ] Run PTCST with seeds 7, 19, 43, 71 and 101.
-- [ ] Save checkpoints, learning curves and validation selection records.
+- [x] Run PTCST with seeds 7, 19, 43, 71 and 101 (local sweep).
+- [x] Save checkpoints, learning curves and validation selection records (per seed).
 - [x] Run PTCST-Top20 (seed-7 local run).
 - [x] Run PTCST-MVO (seed-7 local run).
 - [x] Run PTCST-CA-MVO (seed-7 local run).
