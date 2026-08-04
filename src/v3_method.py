@@ -180,7 +180,7 @@ def spearman_ic(pred: np.ndarray, target: np.ndarray, mask: np.ndarray) -> float
     return float(np.nanmean(values)) if values else float("nan")
 
 
-def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path, epochs: int = 100, seed: int = 7, batch_dates: int = 16, device: str | None = None) -> dict[str, object]:
+def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path, epochs: int = 100, seed: int = 7, batch_dates: int = 16, device: str | None = None, early_stopping_patience: int = 10) -> dict[str, object]:
     seed_everything(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -191,6 +191,7 @@ def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path,
     vx, vy, vm = torch.from_numpy(validation.x), torch.from_numpy(validation.y), torch.from_numpy(validation.mask)
     best_ic, best_epoch = -np.inf, 0
     history = []
+    stale_epochs = 0
     for epoch in range(1, epochs + 1):
         model.train(); order = np.random.permutation(len(tx)); train_loss = []
         for start in range(0, len(order), batch_dates):
@@ -204,9 +205,14 @@ def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path,
         record = {"epoch": epoch, "train_loss": float(np.mean(train_loss)), "validation_spearman_ic": ic}; history.append(record)
         if np.isfinite(ic) and ic > best_ic:
             best_ic, best_epoch = ic, epoch
+            stale_epochs = 0
             torch.save({"model": model.state_dict(), "seed": seed, "epoch": epoch, "validation_spearman_ic": ic}, output_dir / "best.pt")
+        else:
+            stale_epochs += 1
+            if early_stopping_patience > 0 and stale_epochs >= early_stopping_patience:
+                break
     (output_dir / "training_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
-    return {"best_epoch": best_epoch, "best_validation_spearman_ic": float(best_ic), "device": device, "seed": seed}
+    return {"best_epoch": best_epoch, "best_validation_spearman_ic": float(best_ic), "epochs_completed": len(history), "early_stopping_patience": early_stopping_patience, "device": device, "seed": seed}
 
 
 def predict_ptcst(bundle: TensorBundle, checkpoint: Path, device: str | None = None) -> np.ndarray:
