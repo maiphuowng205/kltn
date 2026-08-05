@@ -508,6 +508,9 @@ freeze-manifest SHA-256 and per-cache-file hashes in `cache_manifest.json`.
 The common baseline forecast schema also records signal/execution dates, seed
 and the label cutoff for every model; non-neural baselines explicitly use a
 null checkpoint field.
+The portfolio benchmark runner caches the shared Ledoit–Wolf fit by
+date/universe, preserving the protocol while making the seven-strategy stage
+reproducibly runnable within Colab time limits.
 The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
 in particular, a clean Colab execution, Drive synchronization and archival of
 the exact notebook outputs have not been claimed complete.

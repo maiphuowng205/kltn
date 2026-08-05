@@ -56,11 +56,20 @@ def main() -> None:
     strategies = ["EW", "EW-BH", "MinVar", "HM-MVO", "Ridge-MVO", "XGB-MVO", "XGB-CA-MVO"]
     returns, weights, trades, solver_rows, missing_events = [], [], [], [], []
 
+    # Risk history depends only on the date's fixed 100-name universe, not on
+    # the strategy.  Caching avoids repeating seven identical Ledoit-Wolf
+    # fits per rebalance and makes the Colab benchmark stage substantially
+    # more predictable without changing the locked estimator or policy.
+    risk_cache: dict[tuple[pd.Timestamp, tuple[str, ...]], tuple[np.ndarray, np.ndarray, dict[str, object]]] = {}
+
     for strategy in strategies:
         w_pre_map: dict[str, float] = {}
         for index, date_value in enumerate(dates):
             date = pd.Timestamp(date_value); rics = weekly.loc[weekly["date"].eq(date), "ric"].astype(str).tolist(); n = len(rics)
-            covariance, valid, risk_status = ledoit_covariance(daily, date, rics)
+            risk_key = (date, tuple(rics))
+            if risk_key not in risk_cache:
+                risk_cache[risk_key] = ledoit_covariance(daily, date, rics)
+            covariance, valid, risk_status = risk_cache[risk_key]
             exited = {ric: weight for ric, weight in w_pre_map.items() if ric not in set(rics)}; exited_weight = float(sum(exited.values()))
             w_pre = np.asarray([w_pre_map.get(ric, 0.0) for ric in rics], dtype=float)
             if index == 0 and w_pre.sum() == 0 and valid.sum() >= 20:
