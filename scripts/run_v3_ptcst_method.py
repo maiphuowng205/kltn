@@ -1,6 +1,6 @@
 """Run the frozen Vietnam V3 method: PTCST forecast + cost-aware MVO."""
 from __future__ import annotations
-import argparse, json, hashlib, platform, subprocess, sys
+import argparse, json, hashlib, platform, shutil, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -11,6 +11,14 @@ ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from src.v3_method import build_tensor_bundle, cost_aware_mvo, ledoit_covariance, predict_ptcst, train_ptcst
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def future_returns(daily: pd.DataFrame) -> pd.DataFrame:
@@ -61,11 +69,35 @@ def main():
     test,_,_=build_tensor_bundle(args.data_root,'test',median,scale)
     (out/'preprocessing.json').write_text(json.dumps({'features':train.x.shape[-1],'lookback':train.x.shape[-2],'median':median.tolist(),'iqr':scale.tolist()},indent=2),encoding='utf-8')
     train_report=train_ptcst(train,val,out,args.epochs,args.seed,args.batch_dates,args.device,args.early_stopping_patience,args.model_type)
-    val_pred=predict_ptcst(val,out/'best.pt',args.device,args.model_type); test_pred=predict_ptcst(test,out/'best.pt',args.device,args.model_type)
+    checkpoint_path = out / 'best.pt'
+    checkpoint_sha256 = sha256_file(checkpoint_path)
+    val_pred=predict_ptcst(val,checkpoint_path,args.device,args.model_type); test_pred=predict_ptcst(test,checkpoint_path,args.device,args.model_type)
+    train_cutoff = pd.Timestamp(train.dates[-1]).date().isoformat()
+    validation_cutoff = pd.Timestamp(val.dates[-1]).date().isoformat()
     forecast_rows=[]
     for bundle,pred,name in ((val,val_pred,'validation'),(test,test_pred,'test')):
+        # Validation labels are used only for checkpoint selection; test
+        # forecasts therefore carry the validation cutoff as their selection
+        # cutoff.  This makes every prediction auditable without implying that
+        # test labels were available during fitting.
+        cutoff = train_cutoff if name == 'validation' else validation_cutoff
         for i,date in enumerate(bundle.dates):
-            for j,ric in enumerate(bundle.rics[i]): forecast_rows.append({'date':pd.Timestamp(date),'ric':ric,'split':name,'prediction_excess_return_5d_bps':float(pred[i,j]),'target_excess_return_5d_bps':float(bundle.y[i,j]),'target_available':bool(bundle.mask[i,j])})
+            for j,ric in enumerate(bundle.rics[i]):
+                execution = bundle.execution_dates[i, j]
+                forecast_rows.append({
+                    'date': pd.Timestamp(date),
+                    'signal_date': pd.Timestamp(date),
+                    'execution_date': pd.Timestamp(execution),
+                    'ric': str(ric),
+                    'split': name,
+                    'model': args.model_type,
+                    'seed': int(args.seed),
+                    'training_cutoff': cutoff,
+                    'checkpoint_sha256': checkpoint_sha256,
+                    'prediction_excess_return_5d_bps': float(pred[i,j]),
+                    'target_excess_return_5d_bps': float(bundle.y[i,j]),
+                    'target_available': bool(bundle.mask[i,j]),
+                })
     forecasts=pd.DataFrame(forecast_rows); forecasts.to_parquet(out/'forecasts.parquet',index=False)
     forecast_metrics_by_date(forecasts).to_parquet(out/'forecast_metrics_by_date.parquet',index=False)
     (out/'imputer.json').write_text(json.dumps({'method':'train_median','median':median.tolist()},indent=2),encoding='utf-8')
@@ -111,5 +143,20 @@ def main():
     pd.DataFrame(weights).to_parquet(out/'weights.parquet',index=False); pd.DataFrame(trades).to_parquet(out/'trades.parquet',index=False); returns_df=pd.DataFrame(returns); returns_df.to_parquet(out/'portfolio_returns.parquet',index=False); pd.DataFrame(solver_rows).to_parquet(out/'solver_log.parquet',index=False); pd.DataFrame(missing_events, columns=['date','ric','reason']).to_parquet(out/'missing_price_events.parquet',index=False)
     eval_returns=returns_df.loc[returns_df.evaluation_available] if len(returns_df) else returns_df
     summary={'created_at_utc':datetime.now(timezone.utc).isoformat(),'model_type':args.model_type,'method':f'{args.model_type} forecast + Ledoit-Wolf covariance + cost-aware long-only MVO','train':train_report,'test_dates':len(returns_df),'evaluation_dates':len(eval_returns),'excluded_incomplete_dates':int(len(returns_df)-len(eval_returns)),'mean_net_excess_5d':float(eval_returns.net_excess_return_5d.mean()) if len(eval_returns) else None,'net_sharpe_annualized':float(eval_returns.net_excess_return_5d.mean()/eval_returns.net_excess_return_5d.std(ddof=1)*np.sqrt(52)) if len(eval_returns)>1 and eval_returns.net_excess_return_5d.std(ddof=1)>0 else None,'mean_turnover':float(eval_returns.turnover_l1.mean()) if len(eval_returns) else None,'epochs':args.epochs,'seed':args.seed}
-    (out/'metrics.json').write_text(json.dumps(summary,indent=2),encoding='utf-8'); (out/'run.log').write_text(json.dumps({'status':'completed','metrics':summary},indent=2),encoding='utf-8'); print(json.dumps(summary,indent=2))
+    config_source = ROOT / 'configs' / 'v3_main.yaml'
+    if config_source.exists():
+        shutil.copy2(config_source, out / 'config.yaml')
+    run_manifest = {
+        'created_at_utc': datetime.now(timezone.utc).isoformat(),
+        'git_commit': git_sha,
+        'freeze_id': manifest.get('freeze_id'),
+        'model': args.model_type,
+        'seed': int(args.seed),
+        'checkpoint_sha256': checkpoint_sha256,
+        'training_cutoff': train_cutoff,
+        'selection_cutoff': validation_cutoff,
+        'artifacts': sorted(p.name for p in out.iterdir() if p.is_file()),
+    }
+    (out/'run_manifest.json').write_text(json.dumps(run_manifest,indent=2),encoding='utf-8')
+    (out/'metrics.json').write_text(json.dumps(summary,indent=2),encoding='utf-8'); (out/'run.log').write_text(json.dumps({'status':'completed','metrics':summary,'checkpoint_sha256':checkpoint_sha256},indent=2),encoding='utf-8'); print(json.dumps(summary,indent=2))
 if __name__=='__main__': main()

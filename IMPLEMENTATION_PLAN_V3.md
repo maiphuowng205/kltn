@@ -490,14 +490,18 @@ Use this checklist in the Colab/Drive run folder. Check an item only after its
 artifact and acceptance tests are present; do not mark a stage complete merely
 because a notebook cell finished.
 
-Local implementation snapshot (2026-08-04): the V3 contract validator, full
+Local implementation snapshot (2026-08-05): the V3 contract validator, full
 100×60×17 tensor loader, common zero/HM/Ridge/XGBoost baselines, non-deep
-portfolio ladder, seed-7 PTCST fixed-split method, PTCST portfolio ablations,
-quarterly Ridge walk-forward and report-table/statistics scripts have been
-implemented and smoke/full-tested under ignored local `runs/` directories.
+portfolio ladder, protocol-locked seed-7 PTCST fixed-split method (run
+`runs/v3_ptcst_main_seed7_v9`), five-seed PTCST aggregation, PTCST portfolio
+ablations, quarterly Ridge walk-forward and report-table/statistics scripts
+have been implemented and smoke/full-tested under ignored local `runs/`
+directories. The method forecast rows carry model, seed, execution date,
+selection cutoff and checkpoint SHA-256 metadata; the method run includes
+`config.yaml` and `run_manifest.json`.
 The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
-in particular, five-seed deep-model aggregation, a clean Colab execution,
-Drive synchronization and the final handoff have not been claimed complete.
+in particular, a clean Colab execution, Drive synchronization and archival of
+the exact notebook outputs have not been claimed complete.
 
 ### Repository and data
 
