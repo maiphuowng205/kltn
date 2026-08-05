@@ -62,6 +62,19 @@ def expanding_historical_mean(train, validation, test) -> dict[str, np.ndarray]:
     return predictions
 
 
+def cutoff_dates(train, bundle, expanding: bool = False) -> list[str]:
+    """Return the latest label date available when each forecast is made."""
+    train_cutoff = pd.Timestamp(train.dates[-1]).date().isoformat()
+    if not expanding:
+        return [train_cutoff] * len(bundle.dates)
+    cutoffs = []
+    previous = train_cutoff
+    for date in bundle.dates:
+        cutoffs.append(previous)
+        previous = pd.Timestamp(date).date().isoformat()
+    return cutoffs
+
+
 def make_metrics(rows: pd.DataFrame) -> pd.DataFrame:
     output = []
     for (model, split, date), group in rows.groupby(["model", "split", "date"], sort=True):
@@ -130,9 +143,27 @@ def main() -> None:
     for model_name, split_predictions in forecasts.items():
         for split, bundle in bundles.items():
             pred = split_predictions[split]
+            expanding = model_name == "historical_mean"
+            cutoffs = cutoff_dates(train, bundle, expanding=expanding)
             for i, date in enumerate(bundle.dates):
                 for j, ric in enumerate(bundle.rics[i]):
-                    rows.append({"date": pd.Timestamp(date), "ric": str(ric), "split": split, "model": model_name, "prediction": float(pred[i, j]), "target": float(bundle.y[i, j]), "target_available": bool(bundle.mask[i, j])})
+                    rows.append({
+                        "date": pd.Timestamp(date),
+                        "signal_date": pd.Timestamp(date),
+                        "execution_date": pd.Timestamp(bundle.execution_dates[i, j]),
+                        "ric": str(ric),
+                        "split": split,
+                        "model": model_name,
+                        "seed": int(args.seed),
+                        "training_cutoff": cutoffs[i],
+                        # Classical baselines have no serialized neural
+                        # checkpoint; null is explicit rather than an
+                        # untraceable placeholder hash.
+                        "checkpoint_sha256": None,
+                        "prediction": float(pred[i, j]),
+                        "target": float(bundle.y[i, j]),
+                        "target_available": bool(bundle.mask[i, j]),
+                    })
     forecast_df = pd.DataFrame(rows)
     metrics_by_date = make_metrics(forecast_df)
     summary = metrics_by_date.groupby(["model", "split"], as_index=False).agg({"n_assets": "mean", "spearman_ic": "mean", "pearson_ic": "mean", "mae_bps": "mean", "rmse_bps": "mean", "directional_accuracy": "mean", "top_minus_bottom_bps": "mean"})

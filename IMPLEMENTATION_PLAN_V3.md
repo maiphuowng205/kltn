@@ -505,6 +505,9 @@ the filesystem-only `sync_v3_handoff.py` archive step.
 Notebook 01 now delegates cache construction to
 `scripts/build_v3_tensor_cache.py`, which writes train-fitted preprocessing,
 freeze-manifest SHA-256 and per-cache-file hashes in `cache_manifest.json`.
+The common baseline forecast schema also records signal/execution dates, seed
+and the label cutoff for every model; non-neural baselines explicitly use a
+null checkpoint field.
 The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
 in particular, a clean Colab execution, Drive synchronization and archival of
 the exact notebook outputs have not been claimed complete.
