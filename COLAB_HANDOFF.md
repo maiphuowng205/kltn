@@ -38,8 +38,11 @@ Run these notebooks from the cloned repository in order:
 
 Notebook 00 copies the Drive package to local Colab storage and aborts if any
 of the 276 freeze-manifest checksums fail. Later notebooks write only to the
-workspace `runs/` and `artifacts/` directories. At the end, sync
-`runs/v3_final_handoff/` and the exact notebook outputs back to Drive.
+workspace `runs/` and `artifacts/` directories. Notebook 07 validates the
+completed method, assembles `runs/v3_final_handoff/`, then calls
+`scripts/sync_v3_handoff.py` to copy the handoff and exact notebook files to
+Drive. The destination is persistent, so the sync manifest is the archive
+receipt for the run.
 
 Do not change `PINNED_COMMIT`, the freeze ID, the feature list, seed list,
 cost rule or split protocol after the protocol lock is created.
