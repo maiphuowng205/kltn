@@ -14,13 +14,20 @@ def main() -> None:
     weekly = pd.read_parquet(args.data_root / "curated" / "universe_weekly.parquet")
     weekly["date"] = pd.to_datetime(weekly["date"]).dt.normalize()
     weekly = weekly.loc[weekly["split"].isin(["train", "validation"])].sort_values(["date", "market_cap_rank"]).groupby("date", sort=True).head(100)
-    daily = pd.read_parquet(args.data_root / "curated" / "daily_panel.parquet")
+    daily = pd.read_parquet(args.data_root / "curated" / "daily_panel.parquet", columns=["date", "ric", "return"])
     daily["date"] = pd.to_datetime(daily["date"]).dt.normalize()
-    calendar = np.sort(daily["date"].unique()); positions = {d: i for i, d in enumerate(calendar)}
+    # Use the same pandas Timestamp key type on both sides.  NumPy datetime64
+    # keys can hash differently across Colab/Pandas versions and cause a
+    # false KeyError for valid weekly dates.
+    calendar = pd.DatetimeIndex(daily["date"].drop_duplicates()).sort_values()
+    positions = {pd.Timestamp(value).normalize(): index for index, value in enumerate(calendar)}
     returns = daily.pivot_table(index="date", columns="ric", values="return", aggfunc="last").reindex(index=calendar)
     rows=[]
     for date, group in weekly.groupby("date", sort=True):
-        rics = group["ric"].astype(str).tolist(); end = positions[date]; window_dates = calendar[max(0, end - 252 + 1):end + 1]
+        rics = group["ric"].astype(str).tolist(); date_key = pd.Timestamp(date).normalize()
+        if date_key not in positions:
+            raise ValueError(f"Weekly date {date_key.date()} is absent from daily_panel calendar")
+        end = positions[date_key]; window_dates = calendar[max(0, end - 252 + 1):end + 1]
         valid = returns.reindex(index=window_dates, columns=rics).notna().all(axis=0)
         rows.append({"split": str(group["split"].iloc[0]), "date": date, "window_rows": len(window_dates), "universe_assets": len(rics), "valid_covariance_assets": int(valid.sum()), "fallback": bool(valid.sum() < 20)})
     report_df=pd.DataFrame(rows); report_df.to_parquet(args.run_dir/'risk_coverage_by_date.parquet',index=False)
