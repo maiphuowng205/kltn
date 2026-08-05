@@ -1,7 +1,8 @@
 # Colab handoff runbook
 
 This is the only remaining external execution gate in `IMPLEMENTATION_PLAN_V3.md`.
-The repository is pinned by Notebook 00 to commit `1225552` and the frozen data
+The repository is pinned by Notebook 00 to commit
+`18b484bcad634b1b1b1cfc41095aa770b322d413` and the frozen data
 must be uploaded manually; no LSEG credentials or LSEG API calls are used in
 Colab.
 
