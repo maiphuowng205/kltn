@@ -2,7 +2,7 @@
 
 This is the only remaining external execution gate in `IMPLEMENTATION_PLAN_V3.md`.
 The repository is pinned by Notebook 00 to immutable SHA
-`6cda05b1b78ea5ae3bcaaafc54ed78d76be46ebb` via tag `v3-colab-final`, and the frozen data
+`c52e00ebab2cb0025881e6a4b80b9ed672edbf06` via tag `v3-colab-checkpoint`, and the frozen data
 must be uploaded manually; no LSEG credentials or LSEG API calls are used in
 Colab.
 
