@@ -511,6 +511,9 @@ null checkpoint field.
 The portfolio benchmark runner caches the shared Ledoit–Wolf fit by
 date/universe, preserving the protocol while making the seven-strategy stage
 reproducibly runnable within Colab time limits.
+`scripts/package_v3_drive.py` has produced a verified local upload archive
+(`runs/vn_v3_lseg_2026-08-03_drive.zip`, 279 packaged files) with a sidecar
+manifest; the archive remains ignored and is not published to GitHub.
 The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
 in particular, a clean Colab execution, Drive synchronization and archival of
 the exact notebook outputs have not been claimed complete.
