@@ -499,6 +499,9 @@ have been implemented and smoke/full-tested under ignored local `runs/`
 directories. The method forecast rows carry model, seed, execution date,
 selection cutoff and checkpoint SHA-256 metadata; the method run includes
 `config.yaml` and `run_manifest.json`.
+Notebook 00 now records package/device metadata, copies the freeze to a local
+read-only input tree and persists setup metadata to Drive; Notebook 07 includes
+the filesystem-only `sync_v3_handoff.py` archive step.
 The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
 in particular, a clean Colab execution, Drive synchronization and archival of
 the exact notebook outputs have not been claimed complete.
