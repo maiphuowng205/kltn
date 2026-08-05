@@ -13,6 +13,12 @@ Upload the complete frozen package to:
 MyDrive/kltn/frozen/vn_v3_lseg_2026-08-03/
 ```
 
+To create a verified upload archive from the local frozen inputs, run
+`python scripts/package_v3_drive.py`. The generated ZIP is ignored by Git and
+contains 276 frozen files plus the two risk-free files and
+`FROZEN_DATASET_V3.md`; upload/extract it so the directory layout above is
+preserved.
+
 The package must preserve:
 
 ```text
