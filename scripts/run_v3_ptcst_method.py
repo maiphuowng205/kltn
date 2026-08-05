@@ -47,7 +47,7 @@ def forecast_metrics_by_date(forecasts: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=ROOT/'data/lseg_v3'); p.add_argument('--run-dir',type=Path,default=ROOT/'runs/v3_ptcst_ca_mvo'); p.add_argument('--model-type',choices=['PTCST','PatchTST','TemporalTransformer'],default='PTCST'); p.add_argument('--epochs',type=int,default=100); p.add_argument('--seed',type=int,default=7); p.add_argument('--batch-dates',type=int,default=16); p.add_argument('--early-stopping-patience',type=int,default=10); p.add_argument('--max-test-dates',type=int,default=0); p.add_argument('--device',default=None); args=p.parse_args()
+    p=argparse.ArgumentParser(); p.add_argument('--data-root',type=Path,default=ROOT/'data/lseg_v3'); p.add_argument('--run-dir',type=Path,default=ROOT/'runs/v3_ptcst_ca_mvo'); p.add_argument('--model-type',choices=['PTCST','PatchTST','TemporalTransformer'],default='PTCST'); p.add_argument('--epochs',type=int,default=100); p.add_argument('--seed',type=int,default=7); p.add_argument('--batch-dates',type=int,default=16); p.add_argument('--early-stopping-patience',type=int,default=10); p.add_argument('--max-test-dates',type=int,default=0); p.add_argument('--device',default=None); p.add_argument('--checkpoint-sync-dir',type=Path,default=None); p.add_argument('--resume-checkpoint',type=Path,default=None); args=p.parse_args()
     out=args.run_dir; out.mkdir(parents=True,exist_ok=True)
     workspace_root=args.data_root.parent.parent
     validator=ROOT/'scripts'/'validate_v3_contract.py'
@@ -68,7 +68,12 @@ def main():
     val,_,_=build_tensor_bundle(args.data_root,'validation',median,scale)
     test,_,_=build_tensor_bundle(args.data_root,'test',median,scale)
     (out/'preprocessing.json').write_text(json.dumps({'features':train.x.shape[-1],'lookback':train.x.shape[-2],'median':median.tolist(),'iqr':scale.tolist()},indent=2),encoding='utf-8')
-    train_report=train_ptcst(train,val,out,args.epochs,args.seed,args.batch_dates,args.device,args.early_stopping_patience,args.model_type)
+    if args.resume_checkpoint is not None:
+        if not args.resume_checkpoint.exists():
+            raise FileNotFoundError(args.resume_checkpoint)
+        if args.checkpoint_sync_dir is not None and (args.checkpoint_sync_dir / 'best.pt').exists() and not (out / 'best.pt').exists():
+            shutil.copy2(args.checkpoint_sync_dir / 'best.pt', out / 'best.pt')
+    train_report=train_ptcst(train, val, out, epochs=args.epochs, seed=args.seed, batch_dates=args.batch_dates, device=args.device, early_stopping_patience=args.early_stopping_patience, model_type=args.model_type, checkpoint_sync_dir=args.checkpoint_sync_dir, resume_checkpoint=args.resume_checkpoint)
     checkpoint_path = out / 'best.pt'
     checkpoint_sha256 = sha256_file(checkpoint_path)
     val_pred=predict_ptcst(val,checkpoint_path,args.device,args.model_type); test_pred=predict_ptcst(test,checkpoint_path,args.device,args.model_type)

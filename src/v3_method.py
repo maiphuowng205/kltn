@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import random
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -230,7 +231,7 @@ def make_forecast_model(model_type: str, n_features: int) -> nn.Module:
     raise ValueError(f"unknown model_type={model_type}")
 
 
-def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path, epochs: int = 100, seed: int = 7, batch_dates: int = 16, device: str | None = None, early_stopping_patience: int = 10, model_type: str = "PTCST") -> dict[str, object]:
+def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path, epochs: int = 100, seed: int = 7, batch_dates: int = 16, device: str | None = None, early_stopping_patience: int = 10, model_type: str = "PTCST", checkpoint_sync_dir: Path | None = None, resume_checkpoint: Path | None = None) -> dict[str, object]:
     seed_everything(seed)
     output_dir.mkdir(parents=True, exist_ok=True)
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -242,7 +243,22 @@ def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path,
     best_ic, best_epoch = -np.inf, 0
     history = []
     stale_epochs = 0
-    for epoch in range(1, epochs + 1):
+    start_epoch = 1
+    if resume_checkpoint is not None:
+        state = torch.load(resume_checkpoint, map_location=device)
+        model.load_state_dict(state["model"])
+        if state.get("optimizer") is not None:
+            optimizer.load_state_dict(state["optimizer"])
+        history = list(state.get("history", []))
+        best_ic = float(state.get("best_ic", -np.inf))
+        best_epoch = int(state.get("best_epoch", 0))
+        stale_epochs = int(state.get("stale_epochs", 0))
+        start_epoch = int(state.get("epoch", 0)) + 1
+    if checkpoint_sync_dir is not None:
+        checkpoint_sync_dir = Path(checkpoint_sync_dir)
+        checkpoint_sync_dir.mkdir(parents=True, exist_ok=True)
+    for epoch in range(start_epoch, epochs + 1):
+        should_stop = False
         model.train(); order = np.random.permutation(len(tx)); train_loss = []
         for start in range(0, len(order), batch_dates):
             idx = torch.as_tensor(order[start:start + batch_dates])
@@ -260,7 +276,27 @@ def train_ptcst(train: TensorBundle, validation: TensorBundle, output_dir: Path,
         else:
             stale_epochs += 1
             if early_stopping_patience > 0 and stale_epochs >= early_stopping_patience:
-                break
+                should_stop = True
+        last_state = {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "model_type": model_type,
+            "seed": seed,
+            "epoch": epoch,
+            "best_ic": float(best_ic),
+            "best_epoch": int(best_epoch),
+            "stale_epochs": int(stale_epochs),
+            "history": history,
+        }
+        last_path = output_dir / "last.pt"
+        torch.save(last_state, last_path)
+        if checkpoint_sync_dir is not None:
+            shutil.copy2(last_path, checkpoint_sync_dir / "last.pt")
+            best_path = output_dir / "best.pt"
+            if best_path.exists():
+                shutil.copy2(best_path, checkpoint_sync_dir / "best.pt")
+        if should_stop:
+            break
     (output_dir / "training_history.json").write_text(json.dumps(history, indent=2), encoding="utf-8")
     return {"model_type": model_type, "best_epoch": best_epoch, "best_validation_spearman_ic": float(best_ic), "epochs_completed": len(history), "early_stopping_patience": early_stopping_patience, "device": device, "seed": seed}
 

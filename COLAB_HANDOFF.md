@@ -53,3 +53,9 @@ receipt for the run.
 
 Do not change `PINNED_COMMIT`, the freeze ID, the feature list, seed list,
 cost rule or split protocol after the protocol lock is created.
+
+Notebook 04 persists deep-model checkpoints under
+`MyDrive/kltn/runs/checkpoints/`. Each model/seed keeps `last.pt` (optimizer,
+epoch, best score and training history) plus `best.pt`; rerunning Notebook 04
+with the same pinned code resumes from `last.pt` when a prior runtime stopped
+before `metrics.json` was written.

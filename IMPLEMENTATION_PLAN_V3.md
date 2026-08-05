@@ -511,6 +511,9 @@ null checkpoint field.
 The portfolio benchmark runner caches the shared Ledoit–Wolf fit by
 date/universe, preserving the protocol while making the seven-strategy stage
 reproducibly runnable within Colab time limits.
+Deep training now writes resumable `last.pt`/`best.pt` checkpoints with
+optimizer state and history to a Drive checkpoint root when Notebook 04 runs;
+the seed/deep-baseline sweep detects and resumes an incomplete run.
 `scripts/package_v3_drive.py` has produced a verified local upload archive
 (`runs/vn_v3_lseg_2026-08-03_drive.zip`, 279 packaged files) with a sidecar
 manifest; the archive remains ignored and is not published to GitHub.
