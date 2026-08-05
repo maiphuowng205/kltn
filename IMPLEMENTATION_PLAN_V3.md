@@ -502,6 +502,9 @@ selection cutoff and checkpoint SHA-256 metadata; the method run includes
 Notebook 00 now records package/device metadata, copies the freeze to a local
 read-only input tree and persists setup metadata to Drive; Notebook 07 includes
 the filesystem-only `sync_v3_handoff.py` archive step.
+Notebook 01 now delegates cache construction to
+`scripts/build_v3_tensor_cache.py`, which writes train-fitted preprocessing,
+freeze-manifest SHA-256 and per-cache-file hashes in `cache_manifest.json`.
 The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
 in particular, a clean Colab execution, Drive synchronization and archival of
 the exact notebook outputs have not been claimed complete.
