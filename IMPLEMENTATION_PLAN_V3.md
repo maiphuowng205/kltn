@@ -493,7 +493,7 @@ because a notebook cell finished.
 Local implementation snapshot (2026-08-05): the V3 contract validator, full
 100×60×17 tensor loader, common zero/HM/Ridge/XGBoost baselines, non-deep
 portfolio ladder, protocol-locked seed-7 PTCST fixed-split method (run
-`runs/v3_ptcst_main_seed7_v9`), five-seed PTCST aggregation, PTCST portfolio
+`runs/v3_ptcst_main_seed7_v10`), five-seed PTCST aggregation, PTCST portfolio
 ablations, quarterly Ridge walk-forward and report-table/statistics scripts
 have been implemented and smoke/full-tested under ignored local `runs/`
 directories. The method forecast rows carry model, seed, execution date,
