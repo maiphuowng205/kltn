@@ -16,7 +16,7 @@ def portable_path(path: Path) -> str:
 
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument('--method-run',type=Path,default=ROOT/'runs/v3_ptcst_main_seed7_v6'); p.add_argument('--baseline-run',type=Path,default=ROOT/'runs/v3_forecast_baselines_main'); p.add_argument('--portfolio-run',type=Path,default=ROOT/'runs/v3_portfolio_benchmarks_main'); p.add_argument('--ablation-run',type=Path,default=ROOT/'runs/v3_ptcst_ablations_main'); p.add_argument('--stats-run',type=Path,default=ROOT/'runs/v3_statistical_tests_final'); p.add_argument('--robustness-run',type=Path,default=ROOT/'runs/v3_robustness_main'); p.add_argument('--seed-run',type=Path,default=ROOT/'runs/v3_ptcst_seed_sweep'); p.add_argument('--tables-run',type=Path,default=ROOT/'runs/v3_tables_final2'); p.add_argument('--leakage-report',type=Path,default=ROOT/'runs/v3_leakage_report.json'); p.add_argument('--determinism-report',type=Path,default=ROOT/'runs/v3_determinism_report.json'); p.add_argument('--risk-run',type=Path,default=ROOT/'runs/v3_risk_coverage_main'); p.add_argument('--output',type=Path,default=ROOT/'runs/v3_final_handoff'); a=p.parse_args(); a.output.mkdir(parents=True,exist_ok=True)
+    p=argparse.ArgumentParser(); p.add_argument('--method-run',type=Path,default=ROOT/'runs/v3_ptcst_main_seed7_v6'); p.add_argument('--baseline-run',type=Path,default=ROOT/'runs/v3_forecast_baselines_main'); p.add_argument('--portfolio-run',type=Path,default=ROOT/'runs/v3_portfolio_benchmarks_main'); p.add_argument('--ablation-run',type=Path,default=ROOT/'runs/v3_ptcst_ablations_main'); p.add_argument('--stats-run',type=Path,default=ROOT/'runs/v3_statistical_tests_final'); p.add_argument('--robustness-run',type=Path,default=ROOT/'runs/v3_robustness_main'); p.add_argument('--seed-run',type=Path,default=ROOT/'runs/v3_ptcst_seed_sweep'); p.add_argument('--tables-run',type=Path,default=ROOT/'runs/v3_tables_final2'); p.add_argument('--leakage-report',type=Path,default=ROOT/'runs/v3_leakage_report.json'); p.add_argument('--determinism-report',type=Path,default=ROOT/'runs/v3_determinism_report.json'); p.add_argument('--risk-run',type=Path,default=ROOT/'runs/v3_risk_coverage_main'); p.add_argument('--cache-run',type=Path,default=ROOT/'artifacts/v3_tensor_cache'); p.add_argument('--output',type=Path,default=ROOT/'runs/v3_final_handoff'); a=p.parse_args(); a.output.mkdir(parents=True,exist_ok=True)
     if not a.method_run.exists() and (ROOT/'runs/v3_ptcst_main_seed7_v8').exists():
         a.method_run = ROOT/'runs/v3_ptcst_main_seed7_v8'
     sources=[
@@ -29,6 +29,7 @@ def main():
         (a.leakage_report.parent, [('v3_leakage_report.json', 'v3_leakage_report.json')]),
         (a.determinism_report.parent, [('v3_determinism_report.json', 'v3_determinism_report.json')]),
         (a.risk_run, [('risk_coverage_by_date.parquet', 'risk_coverage_by_date.parquet'), ('risk_coverage_summary.parquet', 'risk_coverage_summary.parquet'), ('metrics.json', 'risk_coverage_metrics.json')]),
+        (a.cache_run, [('cache_manifest.json', 'tensor_cache_manifest.json'), ('preprocessing.json', 'tensor_cache_preprocessing.json')]),
         (ROOT/'configs', [('v3_main.yaml', 'v3_main.yaml'), ('v3_robustness.yaml', 'v3_robustness.yaml')]),
     ]
     copied=[]
