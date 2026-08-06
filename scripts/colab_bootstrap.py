@@ -91,6 +91,16 @@ for name in RESTORE_RUNS:
     if source.exists():
         shutil.copytree(source, destination, dirs_exist_ok=True)
         restored.append(name)
+for name in [
+    'v3_leakage_report.json', 'v3_determinism_forecast.json',
+    'v3_determinism_portfolio.json', 'v3_determinism_report.json',
+    'v3_method_validation.json',
+]:
+    source = DRIVE_RUN_ROOT / name
+    destination = WORKSPACE / 'runs' / name
+    if source.exists():
+        shutil.copy2(source, destination)
+        restored.append(f'runs/{name}')
 source_cache = DRIVE_RUN_ROOT / 'artifacts' / 'v3_tensor_cache'
 if source_cache.exists():
     shutil.copytree(source_cache, WORKSPACE / 'artifacts' / 'v3_tensor_cache', dirs_exist_ok=True)
