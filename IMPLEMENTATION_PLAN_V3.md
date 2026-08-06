@@ -507,6 +507,8 @@ The report-ready local handoff was regenerated from that verified seed-7 run
 and the five-seed summary at `runs/v3_final_handoff`.
 The M7 PTCST-Top20, PTCST-MVO and PTCST-CA-MVO ablations were rerun from the
 same verified seed-7 forecasts and their accounting checks pass.
+M9 statistical inference and the 21-variant M10 robustness grid were also
+rerun from that forecast and are included in the refreshed handoff.
 Notebook 00 now records package/device metadata, copies the freeze to a local
 read-only input tree and persists setup metadata to Drive; Notebook 07 includes
 the filesystem-only `sync_v3_handoff.py` archive step.
