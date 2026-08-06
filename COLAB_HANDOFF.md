@@ -62,8 +62,8 @@ before `metrics.json` was written.
 
 ## Current method gate
 
-The current orchestration notebook is from commit
-`aaf0421dd64088df0ab46d605e19e3011fe0eac2`. In Notebook 04 run Bootstrap,
+The Notebook 04 orchestration content is pinned at immutable commit
+`1cab696e57d1a19ad85e2d21824eeaf6702ada91`. In Notebook 04 run Bootstrap,
 then the main PTCST five-seed cell, then the artifact-sync/seed-7 validation
 cell. Leave `RUN_DEEP_BASELINES = False` until the proposed method is archived.
 
