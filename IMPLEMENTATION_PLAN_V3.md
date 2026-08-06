@@ -490,13 +490,17 @@ Use this checklist in the Colab/Drive run folder. Check an item only after its
 artifact and acceptance tests are present; do not mark a stage complete merely
 because a notebook cell finished.
 
-Local implementation snapshot (2026-08-05): the V3 contract validator, full
+Local implementation snapshot (2026-08-06): the V3 contract validator, full
 100×60×17 tensor loader, common zero/HM/Ridge/XGBoost baselines, non-deep
 portfolio ladder, protocol-locked seed-7 PTCST fixed-split method (run
 `runs/v3_ptcst_main_seed7_v11`), five-seed PTCST aggregation, PTCST portfolio
 ablations, quarterly Ridge walk-forward and report-table/statistics scripts
 have been implemented and smoke/full-tested under ignored local `runs/`
-directories. The method forecast rows carry model, seed, execution date,
+directories. A fresh five-seed PTCST sweep is complete at
+`runs/v3_ptcst_seed_sweep`; all five seeds contain the required metadata,
+checkpoints, forecasts and portfolio artifacts, and the independent method
+validator passes on seed 7 (`runs/v3_ptcst_seed_sweep/method_validation.json`).
+The method forecast rows carry model, seed, execution date,
 selection cutoff and checkpoint SHA-256 metadata; the method run includes
 `config.yaml` and `run_manifest.json`.
 Notebook 00 now records package/device metadata, copies the freeze to a local
