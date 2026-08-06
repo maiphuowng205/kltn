@@ -59,3 +59,23 @@ Notebook 04 persists deep-model checkpoints under
 epoch, best score and training history) plus `best.pt`; rerunning Notebook 04
 with the same pinned code resumes from `last.pt` when a prior runtime stopped
 before `metrics.json` was written.
+
+## Current method gate
+
+The current orchestration notebook is from commit
+`0c8db30b519079e9a68cafa73bed4655c4a5ba9f`. In Notebook 04 run Bootstrap,
+then the main PTCST five-seed cell, then the artifact-sync/seed-7 validation
+cell. Leave `RUN_DEEP_BASELINES = False` until the proposed method is archived.
+
+The method gate is accepted only when:
+
+- `runs/v3_ptcst_seed_sweep/seed_summary.parquet` has five rows for seeds
+  `7, 19, 43, 71, 101`;
+- every seed directory contains `metrics.json`, `config.yaml`,
+  `run_manifest.json`, `best.pt`, `forecasts.parquet` and
+  `portfolio_returns.parquet`;
+- `v3_method_validation.json` reports a `PASS` run and the final sync cell
+  prints the Drive checkpoint and artifact destinations.
+
+The local reference run has mean annualized net Sharpe `1.3704` across the
+five seeds; this is a reproducibility reference, not a selection threshold.
