@@ -18,6 +18,29 @@ from google.colab import drive
 
 drive.mount('/content/drive')
 
+
+def remount_drive() -> None:
+    """Recover a stale Drive FUSE mount before retrying a file copy."""
+    print('Drive copy failed; forcing a Google Drive remount and retrying once.')
+    drive.mount('/content/drive', force_remount=True)
+
+
+def copy_frozen_tree_with_retry(source: Path, destination: Path) -> None:
+    """Copy the immutable input tree, recovering one transient FUSE failure."""
+    try:
+        shutil.copytree(source, destination)
+    except (OSError, shutil.Error) as first_error:
+        if destination.exists():
+            shutil.rmtree(destination)
+        remount_drive()
+        try:
+            shutil.copytree(source, destination)
+        except (OSError, shutil.Error) as retry_error:
+            raise RuntimeError(
+                'Unable to copy the frozen V3 package from Drive after a remount. '
+                'Check that the Drive archive is fully uploaded and rerun Bootstrap.'
+            ) from retry_error
+
 REPO = Path('/content/kltn')
 PINNED_COMMIT = 'c52e00ebab2cb0025881e6a4b80b9ed672edbf06'
 PINNED_REF = 'refs/tags/v3-colab-checkpoint'
@@ -61,10 +84,16 @@ if not (V3_DRIVE_ROOT / 'data' / 'lseg_v3').exists() and not (V3_DRIVE_ROOT / 'c
 
 if not (WORKSPACE / 'data').exists():
     if (V3_DRIVE_ROOT / 'data').exists():
-        shutil.copytree(V3_DRIVE_ROOT / 'data', WORKSPACE / 'data')
+        copy_frozen_tree_with_retry(V3_DRIVE_ROOT / 'data', WORKSPACE / 'data')
     else:
         (WORKSPACE / 'data').mkdir(parents=True, exist_ok=True)
-        shutil.copytree(V3_DRIVE_ROOT, DATA_ROOT, dirs_exist_ok=True)
+        try:
+            shutil.copytree(V3_DRIVE_ROOT, DATA_ROOT, dirs_exist_ok=True)
+        except (OSError, shutil.Error):
+            if (WORKSPACE / 'data').exists():
+                shutil.rmtree(WORKSPACE / 'data')
+            remount_drive()
+            shutil.copytree(V3_DRIVE_ROOT, DATA_ROOT, dirs_exist_ok=True)
 
 # Frozen data is an input, never a run-output location.
 for path in (WORKSPACE / 'data').rglob('*'):
