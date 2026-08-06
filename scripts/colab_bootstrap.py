@@ -74,6 +74,28 @@ WORKSPACE.joinpath('runs').mkdir(parents=True, exist_ok=True)
 WORKSPACE.joinpath('artifacts').mkdir(parents=True, exist_ok=True)
 DRIVE_RUN_ROOT.mkdir(parents=True, exist_ok=True)
 
+# Restore completed artifacts from Drive when a later notebook starts in a
+# fresh Colab runtime.  Local /content is ephemeral; Drive is the persistent
+# handoff between notebook sessions.  Existing local files are preserved or
+# merged so a resumable run is never reset by bootstrap.
+RESTORE_RUNS = [
+    'v3_forecast_baselines', 'v3_risk_coverage', 'v3_portfolio_benchmarks',
+    'v3_ptcst_seed_sweep', 'v3_deep_baselines', 'v3_ptcst_ablations',
+    'v3_walk_forward', 'v3_statistical_tests', 'v3_robustness',
+    'v3_tables', 'v3_final_handoff',
+]
+restored = []
+for name in RESTORE_RUNS:
+    source = DRIVE_RUN_ROOT / name
+    destination = WORKSPACE / 'runs' / name
+    if source.exists():
+        shutil.copytree(source, destination, dirs_exist_ok=True)
+        restored.append(name)
+source_cache = DRIVE_RUN_ROOT / 'artifacts' / 'v3_tensor_cache'
+if source_cache.exists():
+    shutil.copytree(source_cache, WORKSPACE / 'artifacts' / 'v3_tensor_cache', dirs_exist_ok=True)
+    restored.append('artifacts/v3_tensor_cache')
+
 commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=REPO, text=True).strip()
 
 def version(name):
@@ -96,3 +118,4 @@ runtime = {
 )
 shutil.copy2(WORKSPACE / 'runs' / 'setup_environment.json', DRIVE_RUN_ROOT / 'setup_environment.json')
 print({'repo': str(REPO), 'commit': commit, 'data_root': str(DATA_ROOT), 'runtime': runtime})
+print({'restored_from_drive': restored})
