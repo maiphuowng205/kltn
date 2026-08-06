@@ -41,6 +41,25 @@ def copy_frozen_tree_with_retry(source: Path, destination: Path) -> None:
                 'Check that the Drive archive is fully uploaded and rerun Bootstrap.'
             ) from retry_error
 
+
+def frozen_tree_complete(data_root: Path) -> bool:
+    """Detect a partial local copy before trusting the workspace input tree."""
+    manifest_path = data_root / 'reports' / 'freeze_manifest_v3.json'
+    if not manifest_path.exists():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        prefix = 'data/lseg_v3/'
+        for entry in manifest.get('files', []):
+            relative = str(entry['path']).replace('\\', '/')
+            if relative.startswith(prefix):
+                relative = relative[len(prefix):]
+            if not (data_root / relative).is_file():
+                return False
+    except (OSError, KeyError, TypeError, ValueError):
+        return False
+    return True
+
 REPO = Path('/content/kltn')
 PINNED_COMMIT = 'c52e00ebab2cb0025881e6a4b80b9ed672edbf06'
 PINNED_REF = 'refs/tags/v3-colab-checkpoint'
@@ -81,6 +100,10 @@ if not (V3_DRIVE_ROOT / 'data' / 'lseg_v3').exists() and not (V3_DRIVE_ROOT / 'c
     V3_DRIVE_ROOT.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archives[0], 'r') as archive:
         archive.extractall(V3_DRIVE_ROOT)
+
+if (WORKSPACE / 'data').exists() and not frozen_tree_complete(DATA_ROOT):
+    print('Local frozen copy is incomplete; removing it before a verified recopy.')
+    shutil.rmtree(WORKSPACE / 'data')
 
 if not (WORKSPACE / 'data').exists():
     if (V3_DRIVE_ROOT / 'data').exists():
