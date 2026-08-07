@@ -529,26 +529,27 @@ the seed/deep-baseline sweep detects and resumes an incomplete run.
 `scripts/package_v3_drive.py` has produced a verified local upload archive
 (`runs/vn_v3_lseg_2026-08-03_drive.zip`, 279 packaged files) with a sidecar
 manifest; the archive remains ignored and is not published to GitHub.
-The unchecked boxes below remain the authoritative Colab/Drive handoff gates;
-in particular, a clean Colab execution, Drive synchronization and archival of
-the exact notebook outputs have not been claimed complete.
+The checklist below now reflects the verified Colab/Drive final handoff. Checked
+items are supported by the downloaded `SYNC_COMPLETE` manifest and archived
+artifacts. Unchecked items are explicitly post-handoff extensions and must use
+a new run ID rather than modifying the frozen V3 result.
 
 ### Repository and data
 
-- [ ] Clone `https://github.com/maiphuowng205/kltn.git`.
-- [ ] Record the pinned Git commit SHA.
-- [ ] Mount Google Drive and set `V3_DRIVE_ROOT`.
-- [ ] Copy the user-uploaded frozen V3 package to Colab local storage.
-- [ ] Verify all 276 freeze-manifest checksums.
-- [ ] Confirm V3 and RF paths are read-only during the run.
-- [ ] Capture Python, package, device and runtime metadata.
+- [x] Clone `https://github.com/maiphuowng205/kltn.git`.
+- [x] Record the pinned Git commit SHA.
+- [x] Mount Google Drive and set `V3_DRIVE_ROOT`.
+- [x] Copy the user-uploaded frozen V3 package to Colab local storage.
+- [x] Verify all 276 freeze-manifest checksums.
+- [x] Confirm V3 and RF paths are read-only during the run.
+- [x] Capture Python, package, device and runtime metadata.
 
 ### M0–M2: data and forecast baselines
 
-- [ ] Run Notebook 00 setup and contract validation.
-- [ ] Build the 100 × 60 × F tensor cache.
-- [ ] Verify timestamps are no later than signal close.
-- [ ] Verify exactly 100 assets per forecast date.
+- [x] Run Notebook 00 setup and contract validation.
+- [x] Build the 100 × 60 × F tensor cache.
+- [x] Verify timestamps are no later than signal close.
+- [x] Verify exactly 100 assets per forecast date.
 - [x] Fit imputer/scaler on train rows only (verified in the seed-7 method run).
 - [x] Run zero and historical-mean forecasts (full local baseline run).
 - [x] Run Ridge forecast (full local baseline run).
@@ -571,8 +572,8 @@ the exact notebook outputs have not been claimed complete.
 
 ### M6–M7: deep models and main ablations
 
-- [x] Run vanilla temporal Transformer (seed-7 full local run).
-- [x] Run PatchTST temporal-only baseline (seed-7 full local run).
+- [ ] Run vanilla temporal Transformer and include final comparable metrics in a new handoff (the optional Colab deep-baseline cell was skipped).
+- [ ] Run PatchTST temporal-only baseline and include final comparable metrics in a new handoff (the optional Colab deep-baseline cell was skipped).
 - [x] Run PTCST with seeds 7, 19, 43, 71 and 101 (local sweep).
 - [x] Save checkpoints, learning curves and validation selection records (per seed).
 - [x] Run PTCST-Top20 (seed-7 local run).
@@ -584,15 +585,16 @@ the exact notebook outputs have not been claimed complete.
 
 - [x] Write protocol-lock JSON before opening test labels.
 - [x] Run fixed-split test once for the locked seed-7 method run.
-- [x] Run expanding quarterly walk-forward (Ridge, eight quarterly retraining points).
-- [x] Verify retraining uses only realized labels (quarterly walk-forward cutoff audit).
+- [ ] Run expanding quarterly walk-forward (Ridge, eight quarterly retraining points) and archive its output in a new handoff.
+- [ ] Verify retraining uses only realized labels (quarterly walk-forward cutoff audit) and archive the cutoff report.
 - [x] Compute forecast and portfolio metrics by date.
 - [x] Run DM/HLN on date-level forecast losses.
-- [x] Run paired block/stationary bootstrap.
+- [x] Run block bootstrap for the date-level forecast-loss comparison.
+- [ ] Run paired block bootstrap for portfolio return, Sharpe, turnover and drawdown differences.
 - [x] Run the pre-specified cost/covariance/lookback robustness grid (21 one-dimension-at-a-time variants; full local run).
 - [x] Generate final tables and run manifest (figures remain a reporting-layer task).
-- [ ] Sync completed artifacts/checkpoints to Drive.
-- [ ] Archive the exact notebook outputs and environment metadata.
+- [x] Sync completed artifacts/checkpoints to Drive (`SYNC_COMPLETE`; 38 handoff files).
+- [x] Archive the exact notebook outputs and environment metadata (8 notebooks archived in the final handoff).
 
 ### Final handoff gate
 
@@ -601,3 +603,28 @@ the exact notebook outputs have not been claimed complete.
 - [x] Every strategy paid the same realized cost rule.
 - [x] Claim restrictions in `FROZEN_DATASET_V3.md` are reproduced in the report.
 - [x] Final report identifies the Git commit, freeze ID and run ID.
+
+### Post-handoff extension backlog — updated 2026-08-06
+
+The items below are intentionally separate from the frozen V3 result. They must
+be run with a new run ID and handoff version; existing test results must not be
+overwritten.
+
+#### P0 — Required before making a stronger methodological claim
+
+- [x] **Forecast pairwise inference:** run PTCST versus Zero, Historical Mean, Ridge and XGBoost separately; save DM/HLN, block-bootstrap confidence intervals and Holm-adjusted p-values in `runs/v3_extension_p0/pairwise_forecast_tests`.
+- [x] **Optimizer unit audit:** save one-date diagnostics for `mu_decimal`, covariance diagonal, expected-return term, risk term and turnover penalty in `runs/v3_extension_p0/optimizer_scale_diagnostic.json`.
+- [x] **Turnover edge-case test:** verify an asset leaving the weekly universe is counted exactly once; test both current-universe and union-universe implementations.
+- [x] **Architecture ablation:** collect temporal-only, no-patching/vanilla Transformer, PatchTST-style temporal-only and full PTCST runs in `runs/v3_extension_p0/architecture_ablation`.
+
+#### P1 — Required for a more complete economic evaluation
+
+- [x] **Portfolio inference:** paired block bootstrap for mean net return, Sharpe, turnover, maximum drawdown and the pre-specified benchmark comparisons in `runs/v3_extension_p1/portfolio_inference`.
+- [x] **Economic metrics:** cumulative wealth, geometric annualized return, annualized volatility, maximum drawdown, Sortino, Calmar, CVaR, hit rate, worst five-period return and rolling 26-week Sharpe in `runs/v3_extension_p1/economic_metrics`.
+- [x] **Year split:** report portfolio results separately for 2024 and 2025 in `year_split_portfolio_summary.csv`.
+
+#### P2 — Optional extensions
+
+- [x] Add an expanding quarterly walk-forward run with a complete cutoff audit. Output is archived under `runs/v3_p2_handoff/quarterly_walk_forward` with a separate SHA-256 manifest and does not alter the frozen final handoff.
+- [ ] Validate the assumed transaction-cost rule against historical bid/ask or tick data if a licensed source becomes available. The V3 availability audit is recorded under `runs/v3_extension_p2/cost_validation` and confirms this remains pending.
+- [ ] Revisit delisting and survivorship limitations only by creating a new dataset freeze, never by mutating V3.

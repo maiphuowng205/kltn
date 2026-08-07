@@ -10,7 +10,7 @@ import pandas as pd
 
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
-from src.v3_method import cost_aware_mvo, ledoit_covariance
+from src.v3_method import cost_aware_mvo, l1_turnover, ledoit_covariance
 
 def future_returns(daily):
     out=[]
@@ -38,7 +38,7 @@ def main():
                 # target already liquidates them and the extra exit is logged.
                 solver={'solver':None,'status':'direct_top20','fallback':None}
             else: target,solver=cost_aware_mvo(mu,cov,w_pre,valid,cost=0.001 if strategy.endswith('CA-MVO') else 0.0,turnover_fixed=float(exited_weight))
-            turnover=float(np.abs(target-w_pre).sum()+exited_weight); realized=[]; raw=[]
+            turnover=l1_turnover(target, w_pre, exited_weight); realized=[]; raw=[]
             for ric in rics:
                 try: row=daily_map.loc[(date,ric)]; realized.append(float(row.future_excess_5d)); raw.append(float(row.future_raw_5d))
                 except KeyError: realized.append(np.nan); raw.append(np.nan)

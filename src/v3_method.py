@@ -329,6 +329,26 @@ def ledoit_covariance(daily: pd.DataFrame, date: pd.Timestamp, rics: list[str], 
     return covariance, valid, status
 
 
+def l1_turnover(w_target: np.ndarray, w_pre: np.ndarray, exited_weight: float = 0.0) -> float:
+    """Return current-universe L1 turnover plus weight exited from the universe.
+
+    The two vectors are defined on the current universe. Weight for names that
+    left the universe is supplied separately through ``exited_weight``. If a
+    caller aligns both vectors on a union universe, it must pass zero for
+    ``exited_weight`` to avoid double counting.
+    """
+    target = np.asarray(w_target, dtype=float).reshape(-1)
+    pre = np.asarray(w_pre, dtype=float).reshape(-1)
+    if target.shape != pre.shape:
+        raise ValueError("w_target and w_pre must have the same shape")
+    if not np.isfinite(target).all() or not np.isfinite(pre).all():
+        raise ValueError("weights must be finite")
+    exited = float(exited_weight)
+    if not np.isfinite(exited) or exited < 0:
+        raise ValueError("exited_weight must be finite and non-negative")
+    return float(np.abs(target - pre).sum() + exited)
+
+
 def cost_aware_mvo(mu: np.ndarray, covariance: np.ndarray, w_pre: np.ndarray, valid: np.ndarray, risk_aversion: float = 10.0, cost: float = 0.001, max_weight: float = 0.05, turnover_cap: float = 0.40, turnover_fixed: float = 0.0) -> tuple[np.ndarray, dict[str, object]]:
     n = len(mu); w = cp.Variable(n)
     variable_turnover = cp.sum(cp.abs(w - w_pre))

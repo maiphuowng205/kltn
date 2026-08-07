@@ -10,7 +10,7 @@ import pandas as pd
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-from src.v3_method import build_tensor_bundle, cost_aware_mvo, ledoit_covariance, predict_ptcst, train_ptcst
+from src.v3_method import build_tensor_bundle, cost_aware_mvo, l1_turnover, ledoit_covariance, predict_ptcst, train_ptcst
 
 
 def sha256_file(path: Path) -> str:
@@ -122,7 +122,7 @@ def main():
         if i == 0 and w_pre.sum() == 0 and valid.sum() >= 20:
             w_pre[valid] = 1.0 / valid.sum()
         w_new,solver=cost_aware_mvo(pred/10000.0,covariance,w_pre,valid,turnover_fixed=exited_weight)
-        turn=float(np.abs(w_new-w_pre).sum()+exited_weight); realized=[]; raw=[]
+        turn=l1_turnover(w_new, w_pre, exited_weight); realized=[]; raw=[]
         for ric in rics:
             try: row=daily_map.loc[(date,ric)]; realized.append(float(row['future_excess_5d'])); raw.append(float(row['future_raw_5d']))
             except KeyError: realized.append(np.nan); raw.append(np.nan)

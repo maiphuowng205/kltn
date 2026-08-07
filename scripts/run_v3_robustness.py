@@ -9,7 +9,7 @@ import pandas as pd
 
 ROOT=Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0,str(ROOT))
-from src.v3_method import cost_aware_mvo, ledoit_covariance
+from src.v3_method import cost_aware_mvo, l1_turnover, ledoit_covariance
 
 def future_returns(daily):
     out=[]
@@ -47,7 +47,7 @@ def main():
         for i,dv in enumerate(dates):
             date=pd.Timestamp(dv); rics=weekly.loc[weekly.date.eq(date),'ric'].astype(str).tolist(); cov,valid,risk=covariance_variant(daily,date,rics,config['covariance'],int(config['lookback'])); exited={r:w for r,w in hold.items() if r not in set(rics)}; exit_weight=sum(exited.values()); pre=np.asarray([hold.get(r,0.) for r in rics]);
             if i==0 and pre.sum()==0 and valid.sum()>=20: pre[valid]=1/valid.sum()
-            mu=np.asarray([pred[(date,r)] for r in rics])/10000.; target,solver=cost_aware_mvo(mu,cov,pre,valid,risk_aversion=float(config['risk_aversion']),cost=float(config['cost']),max_weight=float(config['max_weight']),turnover_cap=float(config['turnover_cap']),turnover_fixed=float(exit_weight)); turnover=float(np.abs(target-pre).sum()+exit_weight); rr=[]; raw=[]
+            mu=np.asarray([pred[(date,r)] for r in rics])/10000.; target,solver=cost_aware_mvo(mu,cov,pre,valid,risk_aversion=float(config['risk_aversion']),cost=float(config['cost']),max_weight=float(config['max_weight']),turnover_cap=float(config['turnover_cap']),turnover_fixed=float(exit_weight)); turnover=l1_turnover(target, pre, exit_weight); rr=[]; raw=[]
             for r in rics:
                 try: row=daily_map.loc[(date,r)]; rr.append(float(row.future_excess_5d)); raw.append(float(row.future_raw_5d))
                 except KeyError: rr.append(np.nan); raw.append(np.nan)
