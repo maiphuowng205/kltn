@@ -812,3 +812,26 @@ assumption and its limitation are unchanged.
 The P2 extension is archived under `runs/v3_p2_handoff/handoff_manifest.json`
 with SHA-256 records. The frozen `runs/v3_final_handoff` directory was not
 modified.
+
+## 26. Current execution status (2026-08-07)
+
+The V3 experimental pipeline is complete for the frozen Vietnam dataset and
+the required extension checks have been executed. No additional notebook run
+is required for the current thesis protocol.
+
+| Workstream | Current status | Evidence |
+|---|---|---|
+| Frozen dataset, leakage and determinism checks | Complete | `runs/v3_final_handoff` and validation reports |
+| Forecast baselines, risk coverage and portfolio benchmarks | Complete | Notebooks 02–03 artifacts |
+| PTCST training, seed sweep and portfolio ablations | Complete | Notebooks 04–05 artifacts |
+| Locked test, robustness and statistical reporting | Complete | Notebook 06–07 artifacts |
+| Pairwise forecast inference, optimizer scale and architecture ablation | Complete | `runs/v3_extension_p0` |
+| Portfolio inference, economic metrics and year split | Complete | `runs/v3_extension_p1` |
+| Quarterly walk-forward and realized-label cutoff audit | Complete; cutoff audit PASS | `runs/v3_p2_handoff/quarterly_walk_forward` |
+| Historical bid/ask or tick-data cost validation | Pending / blocked by data availability | `BLOCKED_NO_OBSERVED_QUOTES`; all V3 costs are imputed |
+
+Notebook 08 has been added to the repository and its output is intended to be
+copied to `MyDrive/kltn/outputs/v3_p2_handoff`. The final interpretation should
+retain the limitation that the 0.001 one-way transaction-cost rule is an
+assumption, not an observed historical spread estimate. Any future attempt to
+validate that rule must use a new licensed-data freeze and a new handoff.
