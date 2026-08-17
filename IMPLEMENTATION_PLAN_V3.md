@@ -628,3 +628,22 @@ overwritten.
 - [x] Add an expanding quarterly walk-forward run with a complete cutoff audit. Output is archived under `runs/v3_p2_handoff/quarterly_walk_forward` with a separate SHA-256 manifest and does not alter the frozen final handoff.
 - [ ] Validate the assumed transaction-cost rule against historical bid/ask or tick data if a licensed source becomes available. The V3 availability audit is recorded under `runs/v3_extension_p2/cost_validation` and confirms this remains pending.
 - [ ] Revisit delisting and survivorship limitations only by creating a new dataset freeze, never by mutating V3.
+
+### ASEAN Top-100 extension — run 2026-08-17
+
+This extension is separate from the frozen Vietnam V3 handoff. The main ASEAN
+specification is the availability-aware Top-100 selected from a pre-specified
+Top-300 pool and staged one country at a time (Indonesia, Malaysia, Philippines,
+Singapore and Thailand). The pure market-cap Top-100 file remains a robustness
+artifact and is not mixed into the main results.
+
+- [x] Build country-specific V3-compatible staging roots with exactly 100 assets per signal date.
+- [x] Run Zero, Historical Mean, Ridge and XGBoost forecast baselines.
+- [x] Run PTCST (seed 7) with Ledoit-Wolf covariance and cost-aware long-only MVO.
+- [x] Run Temporal Transformer and PatchTST deep baselines with the same split and seed.
+- [x] Run EW, EW-BH, MinVar, HM-MVO, Ridge-MVO, XGB-MVO and XGB-CA-MVO benchmarks.
+- [x] Run PTCST-Top20, PTCST-MVO and PTCST-CA-MVO ablations.
+- [x] Run train/validation risk-coverage reports and archive fallback dates.
+- [x] Audit historical end-of-day BID/ASK coverage and implied half-spread against the 10 bps one-way assumption.
+- [x] Aggregate country tables and checksums under `artifacts/asean_v1_aggregate`.
+- [ ] Tick-level implementation-shortfall validation remains pending; the current quote audit is end-of-day only.
