@@ -18,8 +18,22 @@ Parquet files are intended for downstream analysis.
 - `solver_log.csv` and `fallback_log.csv`: optimizer status and all fallback
   events.
 
+The first portfolio allocation is labelled `initial_deployment` and is not
+subject to the recurring turnover cap. The cap applies from the second
+rebalance onward, so an initial 100% deployment is not reported as an
+infeasible 250% cap utilization.
+
 `portfolio_metrics_summary.csv` and `reliability_metrics.csv` are derived
 summary tables, not substitutes for the ledgers.
+
+The reliability table reports `missing_valuation_event_rate_per_asset_day`,
+whose denominator is held asset-days. It also reports the raw event count and
+events per evaluation day. `cumulative_cost_drag` is the cumulative cost over
+the evaluation period; it is not annualized.
+
+The same engine can be run with `--alpha-mode zero` to create a risk-only
+MVO/CA benchmark. This benchmark is required when country calibration maps a
+forecast beta to zero.
 
 ## Turnover definition
 

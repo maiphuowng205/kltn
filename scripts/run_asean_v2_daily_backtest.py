@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--risk-min-history", type=int, default=126, choices=(90, 126, 180, 252))
     p.add_argument("--risk-aversion", type=float, required=True)
     p.add_argument("--turnover-cap", type=float, default=0.40)
+    p.add_argument("--alpha-mode", choices=("calibrated", "zero"), default="calibrated", help="Use calibrated forecast alpha or a zero-alpha risk-only benchmark.")
     p.add_argument(
         "--cost-scenario",
         choices=("C0", "C1", "C2"),
@@ -91,6 +92,8 @@ def main() -> None:
     pred_rics = blob["rics"].astype(str)
     alpha = blob["calibrated_alpha_decimal"].astype(float)
     asset_mask = blob["asset_mask"].astype(bool)
+    if a.alpha_mode == "zero":
+        alpha = np.zeros_like(alpha, dtype=float)
 
     schedule: dict[tuple[str, pd.Timestamp], dict[str, object]] = {}
     skipped_missing_execution = 0
@@ -219,6 +222,11 @@ def main() -> None:
                 )
                 w_pre = np.asarray([holdings.get(ric, 0.0) for ric in rics], dtype=float)
                 max_weight = max(0.05, 1 / max(len(rics), 1))
+                rebalance_type = "initial_deployment" if not holdings else "rebalance"
+                # Initial deployment is not a rebalance: there is no prior
+                # portfolio to constrain.  From the second trade onward the
+                # pre-registered turnover cap is applied normally.
+                optimizer_turnover_cap = 1.0 if rebalance_type == "initial_deployment" else a.turnover_cap
                 target, info = cost_aware_mvo_vector_cost(
                     score,
                     covariance,
@@ -227,7 +235,7 @@ def main() -> None:
                     costs,
                     a.risk_aversion,
                     max_weight,
-                    a.turnover_cap,
+                    optimizer_turnover_cap,
                     exited_turnover,
                     exited_cost,
                 )
@@ -325,6 +333,7 @@ def main() -> None:
                     "solver": info.get("solver"),
                     "solver_status": status,
                     "solver_fallback": info.get("fallback"),
+                    "rebalance_type": rebalance_type,
                 }
                 rebalance_records.append(rebalance_record)
                 risk_records.append(
@@ -343,6 +352,7 @@ def main() -> None:
                         "status": status,
                         "fallback": info.get("fallback"),
                         "objective": info.get("objective"),
+                        "rebalance_type": rebalance_type,
                     }
                 )
                 turnover_records.append(
@@ -356,7 +366,9 @@ def main() -> None:
                         "total_l1_turnover": turnover,
                         "reported_turnover": turnover,
                         "turnover_cap": a.turnover_cap,
-                        "cap_utilization": turnover / a.turnover_cap if a.turnover_cap else np.nan,
+                        "rebalance_type": rebalance_type,
+                        "turnover_cap_applied": rebalance_type != "initial_deployment",
+                        "cap_utilization": turnover / a.turnover_cap if rebalance_type != "initial_deployment" and a.turnover_cap else np.nan,
                     }
                 )
                 if risk_fallback:
@@ -435,6 +447,7 @@ def main() -> None:
     protocol = {
         "timing": "signal close t; execution close t+1; P&L starts t+1 close-to-close",
         "cost_scenario": a.cost_scenario,
+        "alpha_mode": a.alpha_mode,
         "cost_definition": "C0=10bps; C1=lagged country median half-spread; C2=lagged stock-specific half-spread",
         "turnover_definition": "full L1 over the union of prior and current holdings; continuing + forced entry + forced exit",
         "evaluation": "no date dropped for a missing asset valuation",
@@ -458,6 +471,7 @@ def main() -> None:
         "prediction_sha256": sha256_file(a.prediction_file),
         "data_root": str(a.data_root),
         "cost_scenario": a.cost_scenario,
+        "alpha_mode": a.alpha_mode,
         "risk_aversion": a.risk_aversion,
         "files": files,
         "counts": {
