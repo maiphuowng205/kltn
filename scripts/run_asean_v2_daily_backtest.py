@@ -19,7 +19,10 @@ from src.asean_v2 import cost_aware_mvo_vector_cost, ledoit_covariance_min_histo
 
 def main() -> None:
     p=argparse.ArgumentParser(); p.add_argument("--data-root",type=Path,default=ROOT/"artifacts"/"asean_v2"); p.add_argument("--prediction-file",type=Path,required=True); p.add_argument("--run-dir",type=Path,required=True); p.add_argument("--risk-min-history",type=int,default=126,choices=(90,126,180,252)); p.add_argument("--risk-aversion",type=float,required=True,help="Must be selected and locked using development-only validation."); p.add_argument("--turnover-cap",type=float,default=.40); a=p.parse_args(); a.run_dir.mkdir(parents=True,exist_ok=True)
-    panel=pd.read_parquet(a.data_root/"curated"/"daily_panel_v2.parquet"); weekly=pd.read_parquet(a.data_root/"model_ready"/"weekly_features_targets_v2.parquet")
+    panel_path=a.data_root/"curated"/"daily_panel_v2"; weekly_path=a.data_root/"model_ready"/"weekly_features_targets_v2"
+    if not panel_path.exists(): panel_path=panel_path.with_suffix(".parquet")
+    if not weekly_path.exists(): weekly_path=weekly_path.with_suffix(".parquet")
+    panel=pd.read_parquet(panel_path); weekly=pd.read_parquet(weekly_path)
     for frame in (panel,weekly): frame["date"]=pd.to_datetime(frame.date).dt.normalize()
     blob=np.load(a.prediction_file, allow_pickle=False); pred_dates=pd.to_datetime(blob["dates"]).normalize(); pred_countries=blob["countries"].astype(str); pred_rics=blob["rics"].astype(str); alpha=blob["calibrated_alpha_decimal"].astype(float); asset_mask=blob["asset_mask"].astype(bool)
     schedule={}

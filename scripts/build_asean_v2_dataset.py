@@ -102,53 +102,61 @@ def assign_splits(frame: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def main() -> None:
-    a = args()
-    if a.risk_max_window < a.risk_min_history:
-        raise ValueError("risk-max-window must be at least risk-min-history")
-    source, output = a.source_root, a.output_root
-    original = pd.read_parquet(source / "curated" / "daily_panel.parquet")
+def build_country(original: pd.DataFrame, a: argparse.Namespace) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, object]]:
+    """Build one market at a time to stay inside ordinary Colab RAM."""
     require_columns(original, ["country", "ric", "date", "session_id", "return", "rf_daily", "market_cap_rank", "return_60d", "vol_60d"])
     original["date"] = pd.to_datetime(original["date"]).dt.normalize()
-    panel = future_after_execution(original)
-    panel = add_market_regime_and_relative_target(panel)
-    panel = assign_splits(panel)
+    panel = assign_splits(add_market_regime_and_relative_target(future_after_execution(original)))
     feature_ok = panel[["return_60d", "vol_60d", "log_dollar_volume", "log_market_cap"]].notna().all(axis=1)
-    # A security must have enough contiguous return observations for the
-    # covariance window selected below.  The test is strictly past-looking.
     history_ok = []
-    for _, group in panel.groupby(["country", "ric"], sort=False):
+    for _, group in panel.groupby("ric", sort=False):
         contiguous = group.sort_values("session_id")["session_id"].diff().eq(1).astype("int16")
         history_ok.append(contiguous.rolling(a.risk_min_history, min_periods=a.risk_min_history).sum().eq(a.risk_min_history))
     panel["risk_history_eligible_v2"] = pd.concat(history_ok).sort_index().to_numpy(dtype=bool)
     panel["feature_eligible_v2"] = feature_ok
     panel["investable_v2"] = feature_ok & panel["risk_history_eligible_v2"]
     signal = panel.loc[panel["is_weekly_signal"].eq(True) & panel["market_cap_rank"].le(a.top_n)].copy()
-    # Pure Top-N: do not replace a missing Top-100 member with rank 101+.
     universe = signal.loc[signal["investable_v2"]].copy()
-    universe["n_assets_v2"] = universe.groupby(["country", "date"])["ric"].transform("nunique")
-    # The ranking target must be relative to the same investable universe
-    # passed to the model, rather than to all listed names in the daily panel.
-    universe["target_cs_excess_return_5d_bps_v2"] = (
-        universe["target_excess_return_5d_bps_v2"]
-        - universe.groupby(["country", "date"])["target_excess_return_5d_bps_v2"].transform("mean")
-    )
+    universe["n_assets_v2"] = universe.groupby("date")["ric"].transform("nunique")
+    universe["target_cs_excess_return_5d_bps_v2"] = universe["target_excess_return_5d_bps_v2"] - universe.groupby("date")["target_excess_return_5d_bps_v2"].transform("mean")
     universe["target_available_v2"] = universe["target_cs_excess_return_5d_bps_v2"].notna()
+    country = str(original.country.iloc[0])
+    coverage={"country":country,"weekly_dates":int(universe.date.nunique()),"mean_assets":float(universe.n_assets_v2.mean()),"min_assets":int(universe.n_assets_v2.min()),"target_coverage":float(universe.target_available_v2.mean())}
+    return panel,universe,coverage
+
+
+def main() -> None:
+    a = args()
+    if a.risk_max_window < a.risk_min_history:
+        raise ValueError("risk-max-window must be at least risk-min-history")
+    source, output = a.source_root, a.output_root
+    source_panel = source / "curated" / "daily_panel"
+    if not source_panel.exists(): source_panel = source / "curated" / "daily_panel.parquet"
+    if not source_panel.exists(): raise FileNotFoundError(source_panel)
     columns = [
         "country", "date", "ric", "market_cap_rank", "market_cap_usd", "split_v2", "model_eligible_v2",
         "feature_eligible_v2", "risk_history_eligible_v2", "investable_v2", "n_assets_v2",
         "execution_date_v2", "label_start_date_v2", "label_end_date_v2", "target_excess_return_5d_bps_v2",
         "target_cs_excess_return_5d_bps_v2", "target_available_v2",
     ]
-    for directory in (output / "curated", output / "model_ready", output / "reports"):
+    for directory in (output / "curated" / "daily_panel_v2", output / "curated" / "universe_weekly_v2", output / "model_ready" / "weekly_features_targets_v2", output / "reports"):
         directory.mkdir(parents=True, exist_ok=True)
-    panel.to_parquet(output / "curated" / "daily_panel_v2.parquet", index=False)
-    universe[columns].to_parquet(output / "curated" / "universe_weekly_v2.parquet", index=False)
-    universe.to_parquet(output / "model_ready" / "weekly_features_targets_v2.parquet", index=False)
-    coverage = universe.groupby("country").agg(
-        weekly_dates=("date", "nunique"), mean_assets=("n_assets_v2", "mean"), min_assets=("n_assets_v2", "min"),
-        target_coverage=("target_available_v2", "mean"),
-    ).reset_index()
+    coverage_rows=[]
+    for country in ("Indonesia", "Malaysia", "Philippines", "Singapore", "Thailand"):
+        # V2 is a pure Top-100 protocol. Reading the V1 Top-300+ pool only
+        # inflates memory and cannot change membership because no replacement
+        # from rank 101 onward is permitted.
+        original = pd.read_parquet(source_panel, filters=[["country", "=", country], ["market_cap_rank", "<=", a.top_n]])
+        if original.empty: raise RuntimeError(f"No input rows for {country}")
+        panel,universe,coverage=build_country(original,a); key=country.lower()
+        (output / "curated" / "daily_panel_v2" / f"country={key}").mkdir(exist_ok=True)
+        (output / "curated" / "universe_weekly_v2" / f"country={key}").mkdir(exist_ok=True)
+        (output / "model_ready" / "weekly_features_targets_v2" / f"country={key}").mkdir(exist_ok=True)
+        panel.to_parquet(output / "curated" / "daily_panel_v2" / f"country={key}" / "part.parquet", index=False)
+        universe[columns].to_parquet(output / "curated" / "universe_weekly_v2" / f"country={key}" / "part.parquet", index=False)
+        universe.to_parquet(output / "model_ready" / "weekly_features_targets_v2" / f"country={key}" / "part.parquet", index=False)
+        coverage_rows.append(coverage)
+    coverage = pd.DataFrame(coverage_rows)
     coverage.to_csv(output / "reports" / "coverage_v2.csv", index=False)
     report = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),

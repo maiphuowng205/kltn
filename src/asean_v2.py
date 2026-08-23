@@ -60,8 +60,12 @@ def robust_apply(x: np.ndarray, median: np.ndarray, scale: np.ndarray) -> np.nda
 
 def build_bundle(root: Path, start: str, end: str, median: np.ndarray | None = None, scale: np.ndarray | None = None) -> tuple[VariableBundle, np.ndarray, np.ndarray]:
     root = Path(root)
-    panel = pd.read_parquet(root / "curated" / "daily_panel_v2.parquet")
-    weekly = pd.read_parquet(root / "model_ready" / "weekly_features_targets_v2.parquet")
+    panel_path=root / "curated" / "daily_panel_v2"
+    weekly_path=root / "model_ready" / "weekly_features_targets_v2"
+    if not panel_path.exists(): panel_path=panel_path.with_suffix(".parquet")
+    if not weekly_path.exists(): weekly_path=weekly_path.with_suffix(".parquet")
+    panel = pd.read_parquet(panel_path)
+    weekly = pd.read_parquet(weekly_path)
     for frame in (panel, weekly): frame["date"] = pd.to_datetime(frame["date"]).dt.normalize()
     weekly = weekly.loc[weekly.model_eligible_v2 & weekly.date.between(start, end)].copy()
     if weekly.empty: raise RuntimeError(f"No V2 dates for {start} to {end}")

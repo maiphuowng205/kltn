@@ -11,7 +11,9 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def main() -> None:
     p=argparse.ArgumentParser(); p.add_argument("--data-root",type=Path,default=ROOT/"artifacts"/"asean_v2"); p.add_argument("--report",type=Path,default=None); a=p.parse_args()
-    weekly=pd.read_parquet(a.data_root/"model_ready"/"weekly_features_targets_v2.parquet")
+    weekly_path=a.data_root/"model_ready"/"weekly_features_targets_v2"
+    if not weekly_path.exists(): weekly_path=weekly_path.with_suffix(".parquet")
+    weekly=pd.read_parquet(weekly_path)
     for col in ("date","execution_date_v2","label_start_date_v2","label_end_date_v2"): weekly[col]=pd.to_datetime(weekly[col]).dt.normalize()
     errors=[]
     if weekly.market_cap_rank.gt(100).any(): errors.append("pure Top-100 universe contains rank above 100")
