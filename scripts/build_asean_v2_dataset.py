@@ -127,6 +127,12 @@ def main() -> None:
     # Pure Top-N: do not replace a missing Top-100 member with rank 101+.
     universe = signal.loc[signal["investable_v2"]].copy()
     universe["n_assets_v2"] = universe.groupby(["country", "date"])["ric"].transform("nunique")
+    # The ranking target must be relative to the same investable universe
+    # passed to the model, rather than to all listed names in the daily panel.
+    universe["target_cs_excess_return_5d_bps_v2"] = (
+        universe["target_excess_return_5d_bps_v2"]
+        - universe.groupby(["country", "date"])["target_excess_return_5d_bps_v2"].transform("mean")
+    )
     universe["target_available_v2"] = universe["target_cs_excess_return_5d_bps_v2"].notna()
     columns = [
         "country", "date", "ric", "market_cap_rank", "market_cap_usd", "split_v2", "model_eligible_v2",
