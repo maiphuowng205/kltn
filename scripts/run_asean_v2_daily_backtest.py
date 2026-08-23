@@ -26,10 +26,19 @@ def main() -> None:
     for frame in (panel,weekly): frame["date"]=pd.to_datetime(frame.date).dt.normalize()
     blob=np.load(a.prediction_file, allow_pickle=False); pred_dates=pd.to_datetime(blob["dates"]).normalize(); pred_countries=blob["countries"].astype(str); pred_rics=blob["rics"].astype(str); alpha=blob["calibrated_alpha_decimal"].astype(float); asset_mask=blob["asset_mask"].astype(bool)
     schedule={}
+    skipped_missing_execution = 0
     for i,(country,date) in enumerate(zip(pred_countries,pred_dates)):
         signal=weekly.loc[(weekly.country.eq(country))&(weekly.date.eq(date))].sort_values("market_cap_rank")
         if signal.empty: continue
-        execution=pd.Timestamp(signal.execution_date_v2.iloc[0]).normalize()
+        # The final signal date of a country (and any incomplete source tail)
+        # has no following trading session, so its execution date is NaT.  It
+        # cannot be used in a close(t+1) backtest; skip it explicitly instead
+        # of calling Timestamp.normalize() on NaT (which raises AttributeError).
+        execution_raw = pd.to_datetime(signal.execution_date_v2.iloc[0], errors="coerce")
+        if pd.isna(execution_raw):
+            skipped_missing_execution += 1
+            continue
+        execution=pd.Timestamp(execution_raw).normalize()
         entries=[]
         for ric,value,ok in zip(pred_rics[i],alpha[i],asset_mask[i]):
             if ok and ric: entries.append((ric,float(value)))
@@ -73,6 +82,6 @@ def main() -> None:
     daily=pd.DataFrame(daily_records); rebalance=pd.DataFrame(rebalance_records); missing_df=pd.DataFrame(missing,columns=["country","date","ric","reason"])
     daily.to_parquet(a.run_dir/"daily_portfolio_returns.parquet",index=False); rebalance.to_parquet(a.run_dir/"rebalance_log.parquet",index=False); missing_df.to_parquet(a.run_dir/"missing_valuation_events.parquet",index=False)
     summary,reliability=summarize_daily_portfolio(daily,rebalance); summary.to_csv(a.run_dir/"portfolio_metrics_summary.csv",index=False); reliability.to_csv(a.run_dir/"reliability_metrics.csv",index=False)
-    (a.run_dir/"protocol.json").write_text(json.dumps({"timing":"daily state; P&L is applied before close execution; signal t, execute close t+1, label t+2:t+6","cost_scenario":a.cost_scenario,"cost":"C0=10bps; C1=lagged country median half-spread; C2=lagged stock-specific half-spread","evaluation":"no date dropped for a missing asset valuation","risk_min_history":a.risk_min_history,"risk_aversion":a.risk_aversion},indent=2),encoding="utf-8"); print(summary.to_string(index=False))
+    (a.run_dir/"protocol.json").write_text(json.dumps({"timing":"daily state; P&L is applied before close execution; signal t, execute close t+1, label t+2:t+6","cost_scenario":a.cost_scenario,"cost":"C0=10bps; C1=lagged country median half-spread; C2=lagged stock-specific half-spread","evaluation":"no date dropped for a missing asset valuation","risk_min_history":a.risk_min_history,"risk_aversion":a.risk_aversion,"skipped_prediction_rows_missing_execution_date":skipped_missing_execution},indent=2),encoding="utf-8"); print(summary.to_string(index=False))
 
 if __name__=="__main__": main()
