@@ -47,6 +47,7 @@ def main() -> None:
     for seed in [int(v) for v in a.seeds.split(",") if v.strip()]:
         result=train_one(train, validation, a.run_root / f"seed_{seed}", seed, a.epochs, a.device); model=result["model"]
         val_pred=predict(model, validation, a.device); dev_pred=predict(model, development, a.device)
+        np.savez_compressed(a.run_root / f"seed_{seed}" / "validation_predictions.npz", dates=validation.dates, countries=validation.countries, rics=validation.rics, raw_score=val_pred, target_bps=validation.y, target_mask=validation.target_mask, asset_mask=validation.asset_mask)
         calibrator=fit_score_calibrator(val_pred, validation.y, validation.target_mask & validation.asset_mask); alpha=apply_score_calibrator(dev_pred, development.asset_mask, calibrator)
         np.savez_compressed(a.run_root / f"seed_{seed}" / "development_predictions.npz", dates=development.dates, countries=development.countries, rics=development.rics, raw_score=dev_pred, calibrated_alpha_decimal=alpha, target_bps=development.y, target_mask=development.target_mask, asset_mask=development.asset_mask)
         save_json(a.run_root / f"seed_{seed}" / "calibration.json", calibrator)

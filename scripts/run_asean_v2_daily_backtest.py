@@ -18,7 +18,7 @@ from src.asean_v2 import cost_aware_mvo_vector_cost, ledoit_covariance_min_histo
 
 
 def main() -> None:
-    p=argparse.ArgumentParser(); p.add_argument("--data-root",type=Path,default=ROOT/"artifacts"/"asean_v2"); p.add_argument("--prediction-file",type=Path,required=True); p.add_argument("--run-dir",type=Path,required=True); p.add_argument("--risk-min-history",type=int,default=126,choices=(90,126,180,252)); p.add_argument("--risk-aversion",type=float,required=True,help="Must be selected and locked using development-only validation."); p.add_argument("--turnover-cap",type=float,default=.40); a=p.parse_args(); a.run_dir.mkdir(parents=True,exist_ok=True)
+    p=argparse.ArgumentParser(); p.add_argument("--data-root",type=Path,default=ROOT/"artifacts"/"asean_v2"); p.add_argument("--prediction-file",type=Path,required=True); p.add_argument("--run-dir",type=Path,required=True); p.add_argument("--risk-min-history",type=int,default=126,choices=(90,126,180,252)); p.add_argument("--risk-aversion",type=float,required=True,help="Must be selected and locked using development-only validation."); p.add_argument("--turnover-cap",type=float,default=.40); p.add_argument("--cost-scenario",choices=("C0","C1","C2"),default="C2",help="C0=10bps; C1=lagged country median half-spread; C2=lagged stock-specific half-spread."); a=p.parse_args(); a.run_dir.mkdir(parents=True,exist_ok=True)
     panel_path=a.data_root/"curated"/"daily_panel_v2"; weekly_path=a.data_root/"model_ready"/"weekly_features_targets_v2"
     if not panel_path.exists(): panel_path=panel_path.with_suffix(".parquet")
     if not weekly_path.exists(): weekly_path=weekly_path.with_suffix(".parquet")
@@ -55,8 +55,13 @@ def main() -> None:
             task=schedule.get((country,pd.Timestamp(date).normalize()))
             if task:
                 signal_date=task["signal_date"]; rics=[ric for ric,_ in task["entries"]]; score=np.asarray([v for _,v in task["entries"]])
-                signal_rows=country_panel.loc[country_panel.date.eq(signal_date)].set_index("ric")
-                costs=np.asarray([max(float(signal_rows.loc[ric,"quoted_spread_bps"])/20000.0,0.0) if ric in signal_rows.index and pd.notna(signal_rows.loc[ric,"quoted_spread_bps"]) else .001 for ric in rics])
+                history=country_panel.loc[country_panel.date.lt(signal_date)].sort_values("date")
+                country_half=float(history["quoted_spread_bps"].median()/20000.0) if len(history) and history["quoted_spread_bps"].notna().any() else .001
+                if a.cost_scenario=="C0": costs=np.full(len(rics),.001)
+                elif a.cost_scenario=="C1": costs=np.full(len(rics),max(country_half,0.0))
+                else:
+                    last_quote=history.dropna(subset=["quoted_spread_bps"]).drop_duplicates("ric",keep="last").set_index("ric")["quoted_spread_bps"].to_dict()
+                    costs=np.asarray([max(float(last_quote.get(ric,country_half))/20000.0,0.0) for ric in rics])
                 covariance,valid,risk=ledoit_covariance_min_history(country_panel,signal_date,rics,a.risk_min_history); risk_fallback=risk.get("fallback")
                 exited={ric:w for ric,w in holdings.items() if ric not in set(rics)}; exited_turnover=sum(exited.values()); exited_cost=sum(w*last_cost.get(ric,.001) for ric,w in exited.items())
                 w_pre=np.asarray([holdings.get(ric,0.) for ric in rics]); max_weight=max(.05,1/max(len(rics),1))
@@ -68,6 +73,6 @@ def main() -> None:
     daily=pd.DataFrame(daily_records); rebalance=pd.DataFrame(rebalance_records); missing_df=pd.DataFrame(missing,columns=["country","date","ric","reason"])
     daily.to_parquet(a.run_dir/"daily_portfolio_returns.parquet",index=False); rebalance.to_parquet(a.run_dir/"rebalance_log.parquet",index=False); missing_df.to_parquet(a.run_dir/"missing_valuation_events.parquet",index=False)
     summary,reliability=summarize_daily_portfolio(daily,rebalance); summary.to_csv(a.run_dir/"portfolio_metrics_summary.csv",index=False); reliability.to_csv(a.run_dir/"reliability_metrics.csv",index=False)
-    (a.run_dir/"protocol.json").write_text(json.dumps({"timing":"daily state; P&L is applied before close execution; signal t, execute close t+1, label t+2:t+6","cost":"stock-specific lagged end-of-day half-spread, fallback 10 bps","evaluation":"no date dropped for a missing asset valuation","risk_min_history":a.risk_min_history,"risk_aversion":a.risk_aversion},indent=2),encoding="utf-8"); print(summary.to_string(index=False))
+    (a.run_dir/"protocol.json").write_text(json.dumps({"timing":"daily state; P&L is applied before close execution; signal t, execute close t+1, label t+2:t+6","cost_scenario":a.cost_scenario,"cost":"C0=10bps; C1=lagged country median half-spread; C2=lagged stock-specific half-spread","evaluation":"no date dropped for a missing asset valuation","risk_min_history":a.risk_min_history,"risk_aversion":a.risk_aversion},indent=2),encoding="utf-8"); print(summary.to_string(index=False))
 
 if __name__=="__main__": main()

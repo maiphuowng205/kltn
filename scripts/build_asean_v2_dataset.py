@@ -163,6 +163,14 @@ def main() -> None:
         coverage_rows.append(coverage)
     coverage = pd.DataFrame(coverage_rows)
     coverage.to_csv(output / "reports" / "coverage_v2.csv", index=False)
+    split_parts=[]
+    for country in ("Indonesia", "Malaysia", "Philippines", "Singapore", "Thailand"):
+        path=output / "model_ready" / "weekly_features_targets_v2" / country.lower() / "part.parquet"
+        audit=pd.read_parquet(path,columns=["country","date","ric","execution_date_v2","label_start_date_v2","label_end_date_v2","split_v2","purged_from_split"])
+        audit=audit.rename(columns={"date":"signal_date","execution_date_v2":"execution_date","label_start_date_v2":"target_start","label_end_date_v2":"target_end","split_v2":"split"})
+        audit["leakage_flag"]=((audit.split.eq("train") & audit.target_end.ge(pd.Timestamp("2023-01-01"))) | (audit.split.eq("development") & audit.target_end.lt(pd.Timestamp("2023-01-01")))).astype("int8")
+        split_parts.append(audit)
+    pd.concat(split_parts,ignore_index=True).to_csv(output / "reports" / "split_audit.csv",index=False)
     report = {
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "status": "ASEAN_V2_DATASET_BUILT",
