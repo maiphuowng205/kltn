@@ -25,7 +25,9 @@ def main() -> None:
     rows={}
     for country,path in zip(COUNTRIES,paths):
         daily=pd.read_parquet(path)
-        target=output/f"country={country}"; target.mkdir(parents=True,exist_ok=True)
+        # Do not use Hive-style ``country=...`` directories because the file
+        # already contains a string ``country`` column.
+        target=output/country; target.mkdir(parents=True,exist_ok=True)
         daily.to_parquet(target/"part.parquet",index=False)
         rows[country]=len(daily)
     print({"output":str(output),"rows_by_country":rows})
