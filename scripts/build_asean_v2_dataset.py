@@ -26,6 +26,7 @@ def args() -> argparse.Namespace:
     parser.add_argument("--top-n", type=int, default=100)
     parser.add_argument("--risk-min-history", type=int, default=126, choices=(90, 126, 180, 252))
     parser.add_argument("--risk-max-window", type=int, default=252)
+    parser.add_argument("--load-all", action="store_true", help="Load the complete ASEAN V1 panel before per-country V2 construction; requires high-RAM Colab.")
     return parser.parse_args()
 
 
@@ -142,11 +143,15 @@ def main() -> None:
     for directory in (output / "curated" / "daily_panel_v2", output / "curated" / "universe_weekly_v2", output / "model_ready" / "weekly_features_targets_v2", output / "reports"):
         directory.mkdir(parents=True, exist_ok=True)
     coverage_rows=[]
+    all_source = pd.read_parquet(source_panel) if a.load_all else None
     for country in ("Indonesia", "Malaysia", "Philippines", "Singapore", "Thailand"):
         # V2 is a pure Top-100 protocol. Reading the V1 Top-300+ pool only
         # inflates memory and cannot change membership because no replacement
         # from rank 101 onward is permitted.
-        original = pd.read_parquet(source_panel, filters=[["country", "=", country], ["market_cap_rank", "<=", a.top_n]])
+        if all_source is None:
+            original = pd.read_parquet(source_panel, filters=[["country", "=", country], ["market_cap_rank", "<=", a.top_n]])
+        else:
+            original = all_source.loc[all_source.country.eq(country) & all_source.market_cap_rank.le(a.top_n)].copy()
         if original.empty: raise RuntimeError(f"No input rows for {country}")
         panel,universe,coverage=build_country(original,a); key=country.lower()
         (output / "curated" / "daily_panel_v2" / f"country={key}").mkdir(exist_ok=True)
@@ -166,6 +171,7 @@ def main() -> None:
         "timing": "signal at close t; execute at close t+1; target/P&L starts close t+2 and spans five country sessions through t+6",
         "target": "cross-sectional demeaned five-session excess return after execution",
         "risk_history": {"minimum_sessions": a.risk_min_history, "maximum_covariance_window": a.risk_max_window},
+        "load_mode": "all_asean_in_memory" if a.load_all else "country_by_country",
         "purge": "training observations whose label end reaches 2023-01-01 or later are excluded",
         "test_status": "No 2026 holdout is present in this source. 2024-2025 are development evidence only.",
         "coverage": coverage.to_dict(orient="records"),
