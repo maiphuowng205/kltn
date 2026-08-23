@@ -142,6 +142,60 @@ def daily_ic(prediction: np.ndarray, target: np.ndarray, mask: np.ndarray) -> fl
     return float(np.nanmean(values)) if values else float("nan")
 
 
+def _rank_date_metrics(prediction: np.ndarray, target: np.ndarray, mask: np.ndarray) -> dict[str, float]:
+    """Metrics for one country/date. Constant forecasts have no rank signal."""
+    p=np.asarray(prediction, float)[mask]; y=np.asarray(target, float)[mask]
+    if len(p) < 3: return {"n_assets":int(len(p)),"spearman_ic":np.nan,"pearson_ic":np.nan,"top_minus_bottom_bps":np.nan,"mae_bps":np.nan,"rmse_bps":np.nan,"directional_accuracy":np.nan,"cs_prediction_std_bps":np.nan,"rank_defined":False}
+    constant=bool(np.nanstd(p) <= 1e-12)
+    order=np.argsort(p); k=max(1,int(np.floor(len(p)*.2)))
+    return {"n_assets":int(len(p)),"spearman_ic":np.nan if constant else float(pd.Series(p).rank().corr(pd.Series(y).rank())),"pearson_ic":np.nan if constant else float(np.corrcoef(p,y)[0,1]),"top_minus_bottom_bps":np.nan if constant else float(y[order[-k:]].mean()-y[order[:k]].mean()),"mae_bps":float(np.abs(p-y).mean()),"rmse_bps":float(np.sqrt(np.mean((p-y)**2))),"directional_accuracy":np.nan if constant else float(np.mean(np.sign(p)==np.sign(y))),"cs_prediction_std_bps":float(np.std(p,ddof=0)),"rank_defined":not constant}
+
+
+def bootstrap_time_ci(values: np.ndarray, seed: int = 7, draws: int = 2_000) -> tuple[float, float]:
+    """Non-parametric bootstrap over rebalance dates, never individual stocks."""
+    x=np.asarray(values,float); x=x[np.isfinite(x)]
+    if len(x)<2: return (float("nan"),float("nan"))
+    rng=np.random.default_rng(seed); sample=rng.choice(x,size=(draws,len(x)),replace=True).mean(axis=1)
+    return float(np.quantile(sample,.025)),float(np.quantile(sample,.975))
+
+
+def summarize_forecasts(rows: pd.DataFrame, bootstrap_seed: int = 7) -> pd.DataFrame:
+    """Produce the locked, country/model-level V2 forecast table."""
+    needed={"country","date","model","prediction_bps","target_bps","target_available"}
+    if missing:=needed.difference(rows): raise ValueError(f"Missing forecast columns: {sorted(missing)}")
+    per_date=[]
+    for (country,model,date),group in rows.groupby(["country","model","date"],sort=True):
+        valid=group.target_available.to_numpy(bool) & np.isfinite(group.prediction_bps) & np.isfinite(group.target_bps)
+        result={"country":country,"model":model,"date":pd.Timestamp(date)}; result.update(_rank_date_metrics(group.prediction_bps.to_numpy(),group.target_bps.to_numpy(),valid)); per_date.append(result)
+    daily=pd.DataFrame(per_date); summaries=[]
+    for (country,model),group in daily.groupby(["country","model"],sort=True):
+        rank=group.loc[group.rank_defined]
+        original=rows.loc[(rows.country.eq(country))&(rows.model.eq(model))&rows.target_available].copy()
+        p=original.prediction_bps.to_numpy(float); y=original.target_bps.to_numpy(float); valid=np.isfinite(p)&np.isfinite(y)
+        dispersion_ratio=float(np.std(p[valid],ddof=0)/np.std(y[valid],ddof=0)) if valid.sum()>1 and np.std(y[valid])>0 else np.nan
+        slope=float(np.cov(p[valid],y[valid],ddof=0)[0,1]/np.var(p[valid])) if valid.sum()>1 and np.var(p[valid])>1e-12 else np.nan
+        mean_ic=float(rank.spearman_ic.mean()) if len(rank) else np.nan; sd_ic=float(rank.spearman_ic.std(ddof=1)) if len(rank)>1 else np.nan
+        lo,hi=bootstrap_time_ci(rank.spearman_ic.to_numpy(),bootstrap_seed)
+        summaries.append({"country":country,"model":model,"forecast_dates":int(len(group)),"rank_defined_dates":int(len(rank)),"mean_spearman_ic":mean_ic,"mean_ic_ci_low":lo,"mean_ic_ci_high":hi,"median_spearman_ic":float(rank.spearman_ic.median()) if len(rank) else np.nan,"ic_hit_rate":float((rank.spearman_ic>0).mean()) if len(rank) else np.nan,"icir":float(mean_ic/sd_ic) if np.isfinite(sd_ic) and sd_ic>0 else np.nan,"top_minus_bottom_5d_bps":float(rank.top_minus_bottom_bps.mean()) if len(rank) else np.nan,"pearson_ic":float(rank.pearson_ic.mean()) if len(rank) else np.nan,"mae_bps":float(group.mae_bps.mean()),"rmse_bps":float(np.sqrt(np.nanmean(group.rmse_bps.to_numpy()**2))),"directional_accuracy":float(rank.directional_accuracy.mean()) if len(rank) else np.nan,"median_cs_forecast_dispersion_bps":float(group.cs_prediction_std_bps.median()),"dispersion_ratio":dispersion_ratio,"calibration_slope":slope})
+    return daily, pd.DataFrame(summaries)
+
+
+def summarize_daily_portfolio(daily: pd.DataFrame, rebalances: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Locked daily portfolio and reliability tables; daily annualization is 252."""
+    performance=[]; reliability=[]
+    for country,group in daily.groupby("country",sort=True):
+        r=group.net_return.to_numpy(float); r=r[np.isfinite(r)]; gross=group.gross_return.to_numpy(float); cost=group.cost.to_numpy(float)
+        wealth=np.cumprod(1+r) if len(r) else np.array([]); drawdown=wealth/np.maximum.accumulate(wealth)-1 if len(wealth) else np.array([])
+        annual_return=float(np.mean(r)*252) if len(r) else np.nan; annual_vol=float(np.std(r,ddof=1)*np.sqrt(252)) if len(r)>1 else np.nan
+        sharpe=float(annual_return/annual_vol) if np.isfinite(annual_vol) and annual_vol>0 else np.nan
+        rb=rebalances.loc[rebalances.country.eq(country)] if len(rebalances) else rebalances
+        mean_turnover=float(rb.turnover.mean()) if len(rb) else np.nan; annual_turnover=float(rb.turnover.sum()/(len(r)/252)) if len(r) else np.nan
+        cost_drag=float(np.nansum(gross)-np.nansum(r)); efficiency=float(annual_return/annual_turnover) if np.isfinite(annual_turnover) and annual_turnover>0 else np.nan
+        performance.append({"country":country,"evaluation_days":int(len(r)),"annualized_net_excess_return":annual_return,"annualized_volatility":annual_vol,"annualized_net_sharpe":sharpe,"maximum_drawdown":float(drawdown.min()) if len(drawdown) else np.nan,"mean_turnover_per_rebalance":mean_turnover,"annualized_turnover":annual_turnover,"cost_drag":cost_drag,"return_per_unit_turnover":efficiency})
+        reliability.append({"country":country,"scheduled_rebalances":int(len(rb)),"evaluation_coverage":float(len(r)/len(group)) if len(group) else np.nan,"mean_eligible_n":float(rb.assets.mean()) if len(rb) else np.nan,"mean_valid_risk_n":float(rb.valid_risk_assets.mean()) if len(rb) else np.nan,"covariance_fallback_rate":float(rb.risk_fallback.notna().mean()) if len(rb) else np.nan,"solver_fallback_rate":float(rb.solver_fallback.notna().mean()) if len(rb) and "solver_fallback" in rb else np.nan,"missing_return_rate":float(group.missing_valuations.sum()/max(len(group),1))})
+    return pd.DataFrame(performance),pd.DataFrame(reliability)
+
+
 def fit_score_calibrator(prediction: np.ndarray, target_bps: np.ndarray, mask: np.ndarray) -> dict[str, float]:
     zs=[]; ys=[]
     for p, y, m in zip(prediction, target_bps, mask):

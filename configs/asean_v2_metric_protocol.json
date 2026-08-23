@@ -1,0 +1,12 @@
+{
+  "version": "PTCST-v2-metrics-1.0",
+  "forecast_primary": ["mean_spearman_ic", "median_spearman_ic", "ic_hit_rate", "icir", "top_minus_bottom_5d_bps"],
+  "forecast_secondary": ["pearson_ic", "mae_bps", "rmse_bps", "directional_accuracy"],
+  "forecast_diagnostics": ["median_cs_forecast_dispersion_bps", "dispersion_ratio", "calibration_slope"],
+  "portfolio_primary": ["annualized_net_sharpe", "annualized_net_excess_return", "maximum_drawdown", "annualized_volatility"],
+  "portfolio_implementation": ["mean_turnover_per_rebalance", "turnover_reduction", "cost_drag", "return_per_unit_turnover"],
+  "reliability": ["evaluation_coverage", "mean_eligible_n", "mean_valid_risk_n", "covariance_fallback_rate", "solver_fallback_rate", "missing_return_rate"],
+  "annualization": {"daily_state_backtest": 252, "weekly_legacy_only": 52},
+  "inference": "95% bootstrap confidence intervals resample time blocks/rebalance dates, never individual stocks",
+  "selection_rule": "validation-only lexicographic: Mean Spearman IC, then ICIR, then top-minus-bottom; do not choose by test Sharpe"
+}
