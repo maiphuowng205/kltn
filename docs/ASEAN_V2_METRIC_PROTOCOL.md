@@ -23,3 +23,8 @@ All confidence intervals bootstrap dates/rebalance blocks. Model selection is
 validation-only and lexicographic: Mean Spearman IC, then ICIR, then
 top-minus-bottom; a model cannot be declared superior because it wins one
 secondary metric.
+
+`compare_asean_v2_models.py` reports paired ΔIC confidence intervals after
+aligning country/date observations. `compare_asean_v2_portfolios.py` reports
+paired daily ΔSharpe intervals and the required turnover-reduction statistic
+for any cost-aware versus reference strategy pair.
