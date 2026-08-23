@@ -33,7 +33,10 @@ def corr(a: np.ndarray, b: np.ndarray, mask: np.ndarray) -> float:
 
 
 def load_seeds(root: Path, split: str, seeds: list[int]):
-    blobs = [np.load(root / f"seed_{seed}" / f"{split}_predictions.npz", allow_pickle=False) for seed in seeds]
+    blobs = []
+    for seed in seeds:
+        with np.load(root / f"seed_{seed}" / f"{split}_predictions.npz", allow_pickle=False) as archive:
+            blobs.append({key: archive[key] for key in archive.files})
     first = blobs[0]
     for seed, blob in zip(seeds[1:], blobs[1:]):
         for key in ("dates", "countries", "rics"):

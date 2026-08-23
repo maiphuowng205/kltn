@@ -51,13 +51,17 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def load_seed_blobs(root: Path, split: str, seeds: list[int]) -> list[np.lib.npyio.NpzFile]:
+def load_seed_blobs(root: Path, split: str, seeds: list[int]) -> list[dict[str, np.ndarray]]:
     blobs = []
     for seed in seeds:
         path = root / f"seed_{seed}" / f"{split}_predictions.npz"
         if not path.exists():
             raise FileNotFoundError(path)
-        blobs.append(np.load(path, allow_pickle=False))
+        # Materialize compressed NPZ arrays once. Repeated scalar access through
+        # NpzFile can re-open/decompress the member and makes reconciliation
+        # needlessly slow on local Windows runs.
+        with np.load(path, allow_pickle=False) as archive:
+            blobs.append({key: archive[key] for key in archive.files})
     first = blobs[0]
     for seed, blob in zip(seeds[1:], blobs[1:]):
         for key in ("dates", "countries", "rics", "target_bps", "target_mask"):
@@ -358,7 +362,7 @@ def main() -> None:
         for decile, indices in enumerate(np.array_split(order, 10), 1):
             decile_rows.append({"country": country, "date": date, "decile": decile, "n_assets": len(indices), "mean_target_bps": float(np.mean(val_bundle["target_bps"][i, indices]))})
     pd.DataFrame(decile_rows).to_csv(args.output_dir / "ensemble_decile_validation.csv", index=False)
-    final_config = {"ensemble_method": selected, "seed_list": seeds, "normalization_method": "rank-normalized on common per-date universe", "universe_alignment_rule": "seed intersection", "validation_period": "V2 validation split", "weights": weighting, "calibration_beta": betas, "calibration_rule": "country positive beta clipped at zero; fit validation only", "lambda": args.risk_aversion, "turnover_cap": args.turnover_cap, "cost_scenarios": ["C0", "C1", "C2"]}
+    final_config = {"ensemble_method": selected, "seed_list": seeds, "normalization_method": "rank-normalized on common per-date universe", "universe_alignment_rule": "seed intersection", "validation_period": "V2 validation split", "weights": {"ic_weights": weighting["ic_weights"], "tb_weights": weighting["tb_weights"]}, "calibration_beta": betas, "calibration_rule": "country positive beta clipped at zero; fit validation only", "lambda": args.risk_aversion, "turnover_cap": args.turnover_cap, "cost_scenarios": ["C0", "C1", "C2"]}
     (args.output_dir / "ensemble_final_config.yaml").write_text("".join(f"{key}: {json.dumps(value)}\n" for key, value in final_config.items()), encoding="utf-8")
 
     # 10–12: same corrected portfolio engine, PTCST versus risk-only.
