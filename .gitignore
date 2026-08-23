@@ -6,6 +6,8 @@ data/
 archive/
 runs/
 logs/
+artifacts/
+~$*.docx
 .venv/
 __pycache__/
 *.pyc
